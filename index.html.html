@@ -322,7 +322,7 @@
       <div class="brand-mark">✦</div>
       <div>
         <div class="brand-name">SCM-report</div>
-        <div class="brand-sub">Galaxy Studio · Purchasing task tracker</div>
+        <div class="brand-sub">Galaxy Studio · Theo dõi task mua hàng</div>
       </div>
     </div>
     <div class="topbar-actions">
@@ -376,7 +376,7 @@
         <option value="">Tất cả</option><option value="any">Có lỗi / thiếu dữ liệu</option>
       </select></div>
       <label class="chk-field"><input type="checkbox" id="fMine"> Task của tôi</label>
-      <button class="btn btn-line" id="btnClear">Xoá bộ lọc</button>
+      <button class="btn btn-line" id="btnClear">Xóa bộ lọc</button>
     </div>
 
     <div class="table-wrap">
@@ -399,8 +399,8 @@
         <tbody id="taskBody"></tbody>
       </table>
       <div class="empty" id="emptyState" hidden>
-        <div class="empty-title">Chưa có task nào khớp bộ lọc</div>
-        <div>Thử xoá bớt điều kiện lọc, hoặc tạo task mới.</div>
+        <div class="empty-title" id="emptyTitle">Chưa có task nào khớp bộ lọc</div>
+        <div id="emptyText">Bỏ bớt một vài điều kiện lọc để xem thêm task.</div>
       </div>
     </div>
   </section>
@@ -553,7 +553,7 @@
       <div class="field full"><label>Ghi chú</label><textarea id="mNote" placeholder="Tiến độ, ghi chú… (không ghi vào tên hạng mục)"></textarea></div>
     </div>
     <div class="modal-foot">
-      <button class="btn btn-line" id="mCancel">Huỷ</button>
+      <button class="btn btn-line" id="mCancel">Hủy</button>
       <button class="btn btn-gold" id="mSave">Lưu task</button>
     </div>
   </div>
@@ -581,7 +581,7 @@
       <button class="btn btn-line btn-sm" id="mbReset" type="button" hidden>Gửi email đặt lại mật khẩu</button>
     </div>
     <div class="modal-foot">
-      <button class="btn btn-line" id="mbCancel">Huỷ</button>
+      <button class="btn btn-line" id="mbCancel">Hủy</button>
       <button class="btn btn-gold" id="mbSave">Lưu</button>
     </div>
   </div>
@@ -860,7 +860,7 @@
   function removeTask(id){
     if(db){
       return db.doc("tasks/"+id).delete().catch(function(e){
-        console.error(e); showToast("Không xoá được: "+(e&&e.code||"lỗi"));
+        console.error(e); showToast("Không xóa được: "+(e&&e.code||"lỗi"));
       });
     }
     state.tasks = state.tasks.filter(function(x){return x.id!==id;});
@@ -901,7 +901,7 @@
     localSave(); renderAll();
     return Promise.resolve();
   }
-  /* Admin đăng nhập lần đầu sau khi nâng cấp: tự tạo/cập nhật system/access và xoá mật khẩu kiểu cũ. */
+  /* Admin đăng nhập lần đầu sau khi nâng cấp: tự tạo/cập nhật system/access và xóa mật khẩu kiểu cũ. */
   function syncAccessIfAdmin(){
     if(accessSynced || !db || !state.isAdmin) return;
     accessSynced = true;
@@ -1041,11 +1041,28 @@
   }
 
   /* ================= RENDER: TABLE ================= */
+  /* Cột Trạng thái chỉ hiện trạng thái xử lý; tình trạng hạn hiện ở cột Hạn giao */
+  function statusBadge(t){
+    return {"Hoàn thành":"badge-green","Đang xử lý":"badge-blue","Hủy":"badge-grey"}[t.status] || "badge-grey";
+  }
+  function dueHint(t){
+    if(t.status==="Hoàn thành"||t.status==="Hủy"||!t.due_date) return "";
+    var n=daysBetween(todayISO(), t.due_date);
+    if(n<0) return '<div class="item-note" style="color:var(--red-ink);font-weight:600;">Trễ '+(-n)+' ngày</div>';
+    if(n===0) return '<div class="item-note" style="color:var(--red-ink);font-weight:600;">Hạn hôm nay</div>';
+    if(n<=state.config.soonDays) return '<div class="item-note" style="color:var(--gold-ink);font-weight:600;">Còn '+n+' ngày</div>';
+    return "";
+  }
   function renderTable(){
     var rows = getFiltered();
     var dupC = dupNameCount();
     var body = $("taskBody");
     $("emptyState").hidden = rows.length!==0;
+    if(!rows.length){
+      var noData = state.tasks.length===0;
+      $("emptyTitle").textContent = noData ? "Chưa có task nào" : "Không có task khớp bộ lọc";
+      $("emptyText").textContent = noData ? "Bấm + Tạo task để thêm task đầu tiên." : "Bỏ bớt một vài điều kiện lọc để xem thêm task.";
+    }
     body.innerHTML = rows.map(function(t){
       var u = urgencyOf(t);
       var sv = savingOf(t);
@@ -1067,13 +1084,14 @@
         '<td>'+savingHtml+'</td>'+
         '<td>'+(esc(t.supplier)||"—")+'</td>'+
         '<td class="num">'+fmtDate(t.pr_date)+'</td>'+
-        '<td class="num">'+fmtDate(t.due_date)+'</td>'+
-        '<td><span class="badge '+u.cls+'">'+u.label+'</span></td>'+
+        '<td class="num">'+fmtDate(t.due_date)+dueHint(t)+'</td>'+
+        '<td><span class="badge '+statusBadge(t)+'">'+esc(t.status||"—")+'</span>'+
+          (t.urgent_override&&t.status!=="Hoàn thành"&&t.status!=="Hủy"?' <span class="badge badge-red">Gấp</span>':'')+'</td>'+
         '<td class="num">'+fmtDate(t.complete_date)+'</td>'+
         '<td><div class="row-actions">'+(state.canEdit ?
           '<button class="btn-plain-text" data-act="edit" data-id="'+esc(t.id)+'">Sửa</button>'+
           '<button class="btn-plain-text" data-act="dup" data-id="'+esc(t.id)+'">Nhân bản</button>'+
-          '<button class="btn-danger-text" data-act="del" data-id="'+esc(t.id)+'">Xoá</button>' : '')+
+          '<button class="btn-danger-text" data-act="del" data-id="'+esc(t.id)+'">Xóa</button>' : '')+
         '</div></td></tr>';
     }).join("");
 
@@ -1205,7 +1223,7 @@
       '<div class="grade '+g.cls+'">'+g.g+'</div>'+
       '<div class="verdict-body">'+
         '<div class="verdict-headline">'+esc(v.headline)+
-          (score!==null?' <span style="font-size:13px;color:var(--ink-faint);font-weight:500;">· '+score+'/100</span>':'')+'</div>'+
+          (score!==null?' <span style="font-size:13px;color:var(--ink-faint);font-weight:500;">· '+score.toLocaleString("vi-VN")+'/100</span>':'')+'</div>'+
         '<div class="verdict-text">'+esc(v.text)+'</div>'+
       '</div>';
 
@@ -1511,7 +1529,7 @@
             '<div class="member-sub">'+(esc(m.email)||"chưa có email")+
             (m.note?' · '+esc(m.note):'')+' · '+load+' task đang mở</div></div>'+
           '<button class="btn-plain-text" data-mb="edit" data-id="'+esc(m.id)+'">Sửa</button>'+
-          '<button class="btn-danger-text" data-mb="del" data-id="'+esc(m.id)+'">Xoá</button>'+
+          '<button class="btn-danger-text" data-mb="del" data-id="'+esc(m.id)+'">Xóa</button>'+
         '</div>';
       }).join("");
       list.querySelectorAll('[data-mb="edit"]').forEach(function(b){ b.onclick=function(){ openMember(b.dataset.id); }; });
@@ -1627,8 +1645,8 @@
   function deleteTask(id){
     var t=state.tasks.find(function(x){return x.id===id;});
     if(!t) return;
-    if(!confirm('Xoá task "'+t.item+'"? Hành động này không thể hoàn tác.\n\nNếu task chỉ bị dừng, nên đổi trạng thái sang "Hủy" để giữ lại dữ liệu báo cáo.')) return;
-    removeTask(id).then(function(){ showToast("Đã xoá task"); });
+    if(!confirm('Xóa task "'+t.item+'"? Hành động này không thể hoàn tác.\n\nNếu task chỉ bị dừng, nên đổi trạng thái sang "Hủy" để giữ lại dữ liệu báo cáo.')) return;
+    removeTask(id).then(function(){ showToast("Đã xóa task"); });
   }
 
   /* ================= MEMBER MODAL ================= */
@@ -1696,10 +1714,10 @@
   function deleteMember(id){
     var m=state.members.find(function(x){return x.id===id;});
     if(!m) return;
-    if(state.me && m.id===state.me.id){ showToast("Bạn không thể tự xoá chính mình."); return; }
-    if(!confirm('Xoá "'+m.name+'" khỏi danh sách thành viên? Người này sẽ không vào được app nữa. Các task đã gán vẫn giữ nguyên tên PIC.')) return;
+    if(state.me && m.id===state.me.id){ showToast("Bạn không thể tự xóa chính mình."); return; }
+    if(!confirm('Xóa "'+m.name+'" khỏi danh sách thành viên? Người này sẽ không vào được app nữa. Các task đã gán vẫn giữ nguyên tên PIC.')) return;
     state.members = state.members.filter(function(x){return x.id!==id;});
-    saveMembers().then(function(){ showToast("Đã xoá thành viên"); }).catch(function(){});
+    saveMembers().then(function(){ showToast("Đã xóa thành viên"); }).catch(function(){});
   }
 
   /* ================= AUTH (Firebase Authentication) ================= */
