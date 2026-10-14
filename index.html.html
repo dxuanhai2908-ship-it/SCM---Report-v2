@@ -1730,6 +1730,7 @@
     "auth/user-disabled":"Tài khoản này đã bị khoá. Liên hệ admin.",
     "auth/too-many-requests":"Đăng nhập sai quá nhiều lần. Đợi vài phút hoặc bấm Quên mật khẩu.",
     "auth/network-request-failed":"Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.",
+    "auth/configuration-not-found":"Hệ thống chưa bật Firebase Authentication. Admin cần vào Firebase Console → Authentication → Get started, rồi bật Email/Password.",
     "auth/operation-not-allowed":"Hệ thống chưa bật đăng nhập bằng email. Admin cần bật Email/Password trong Firebase Authentication."
   };
   function authMsg(err){ return AUTH_MSG[err&&err.code] || ("Không đăng nhập được ("+(err&&err.code||"lỗi")+")."); }
