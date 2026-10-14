@@ -1,0 +1,49 @@
+rules_version = '2';
+
+// Firestore Rules cho SCM-report.
+// Dán toàn bộ nội dung file này vào: Firebase Console > Firestore Database > Rules > Publish.
+//
+// Quyền dựa trên tài liệu system/access (app tự cập nhật mỗi khi Admin lưu danh sách thành viên):
+//   emails  : mọi email được phép đăng nhập
+//   admins  : email có quyền Admin
+//   viewers : email chỉ được xem
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null;
+    }
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+    function access() {
+      return get(/databases/$(database)/documents/system/access).data;
+    }
+    function isMember() {
+      return signedIn() && myEmail() in access().emails;
+    }
+    function isAdmin() {
+      return signedIn() && myEmail() in access().admins;
+    }
+    function canEdit() {
+      return isMember() && !(myEmail() in access().viewers);
+    }
+
+    // Task mua hàng: thành viên đọc được; thành viên (trừ "Chỉ xem") tạo/sửa/xoá được.
+    match /tasks/{taskId} {
+      allow read: if isMember();
+      allow create, update, delete: if canEdit();
+    }
+
+    // Danh sách thành viên, cấu hình, danh sách quyền: thành viên đọc được, chỉ Admin sửa.
+    match /system/{docId} {
+      allow read: if isMember();
+      allow write: if isAdmin();
+    }
+
+    // Mọi thứ khác: chặn.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -12,6 +12,7 @@
 <!-- Firebase (chỉ dùng khi deploy lên Vercel/Netlify/tên miền riêng). Bỏ qua nếu mở bằng link artifact của Claude. -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <style>
   [hidden]{ display:none !important; }
   :root{
@@ -70,6 +71,8 @@
   .topbar-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;}
   .who{font-size:12.5px;color:#D7D0E8;display:flex;align-items:center;gap:7px;}
   .who b{color:#fff;font-weight:600;}
+  .who-box{display:flex;align-items:center;gap:9px;padding-left:12px;margin-left:4px;border-left:1px solid rgba(255,255,255,.18);}
+  .btn:disabled{opacity:.45;cursor:not-allowed;}
     .role-tag{background:rgba(247,203,166,.25);color:#F7CBA6;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:600;}
   .role-tag.member{background:rgba(255,255,255,.14);color:#E3DEF0;}
 
@@ -314,10 +317,12 @@
       </div>
     </div>
     <div class="topbar-actions">
-      <div class="who" id="whoAmI"><span>Đang kết nối…</span></div>
-      <button class="btn btn-ghost btn-sm" id="btnLogout">Đăng xuất</button>
-      <button class="btn btn-ghost" id="btnExport">⭳ Xuất Excel</button>
-      <button class="btn btn-gold" id="btnNew">+ Task mới</button>
+      <button class="btn btn-ghost" id="btnExport">Xuất Excel</button>
+      <button class="btn btn-gold" id="btnNew">+ Tạo task</button>
+      <div class="who-box">
+        <div class="who" id="whoAmI"><span>Đang kết nối…</span></div>
+        <button class="btn btn-ghost btn-sm" id="btnLogout" hidden>Đăng xuất</button>
+      </div>
     </div>
   </header>
 
@@ -482,7 +487,6 @@
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
         <input type="file" id="importFile" accept=".xlsx,.xls" style="font-size:13px;">
         <button class="btn btn-line" id="btnImport">Nhập từ Excel</button>
-        <button class="btn btn-line" id="btnSeed">Tạo 4 task mẫu</button>
       </div>
     </div>
   </section>
@@ -546,19 +550,17 @@
     </div>
     <div class="modal-body single">
       <div class="field"><label>Họ tên *</label><input type="text" id="mbName" placeholder="VD: Nguyễn Thị Ruby"></div>
-      <div class="field"><label>Email công ty</label><input type="text" id="mbEmail" placeholder="ruby@galaxystudio.vn"></div>
+      <div class="field"><label>Email công ty * <span style="font-weight:400;color:var(--ink-faint);">(dùng để đăng nhập)</span></label><input type="email" id="mbEmail" placeholder="ruby@galaxystudio.vn" autocomplete="off"></div>
       <div class="field"><label>Vai trò</label><select id="mbRole">
         <option value="admin">Admin — quản trị toàn hệ thống</option>
         <option value="member">Thành viên — xử lý task</option>
         <option value="viewer">Chỉ xem — theo dõi báo cáo</option>
       </select></div>
       <div class="field"><label>Ghi chú</label><input type="text" id="mbNote" placeholder="Mảng phụ trách…"></div>
-      <div class="field"><label>Tên đăng nhập</label><input type="text" id="mbUser" placeholder="vd: ruby" autocomplete="off"></div>
-      <div class="field"><label id="mbPassLabel">Mật khẩu</label>
-        <input type="password" id="mbPass" placeholder="Tối thiểu 6 ký tự" autocomplete="new-password"></div>
-      <div style="font-size:12px;color:var(--ink-faint);line-height:1.55;">
-        Để trống mật khẩu khi sửa nếu không muốn đổi. Thành viên chưa có tên đăng nhập sẽ không đăng nhập được.
-      </div>
+      <div class="field" id="mbPassWrap"><label id="mbPassLabel">Mật khẩu ban đầu</label>
+        <input type="password" id="mbPass" placeholder="Tối thiểu 8 ký tự" autocomplete="new-password"></div>
+      <div id="mbHint" style="font-size:12px;color:var(--ink-faint);line-height:1.55;"></div>
+      <button class="btn btn-line btn-sm" id="mbReset" type="button" hidden>Gửi email đặt lại mật khẩu</button>
     </div>
     <div class="modal-foot">
       <button class="btn btn-line" id="mbCancel">Huỷ</button>
@@ -579,16 +581,16 @@
     </div>
     <div class="modal-body single" id="loginBody">
       <div id="loginIntro" style="font-size:13px;color:var(--ink-soft);line-height:1.6;"></div>
-      <div class="field"><label id="lgUserLabel">Tên đăng nhập</label>
-        <input type="text" id="lgUser" autocomplete="username" placeholder="vd: ruby"></div>
+      <div class="field"><label id="lgUserLabel">Email công ty</label>
+        <input type="email" id="lgUser" autocomplete="username" placeholder="ten@galaxystudio.vn"></div>
       <div class="field"><label id="lgPassLabel">Mật khẩu</label>
         <input type="password" id="lgPass" autocomplete="current-password" placeholder="••••••••"></div>
-      <div class="field" id="lgNameWrap" hidden><label>Họ tên hiển thị</label>
-        <input type="text" id="lgName" placeholder="vd: Nguyễn Thị Ruby"></div>
       <div id="lgError" style="font-size:12.5px;color:var(--red-ink);" hidden></div>
+      <div id="lgInfo" style="font-size:12.5px;color:var(--green-ink,#2f6b4c);" hidden></div>
     </div>
-    <div class="modal-foot" style="border:none;">
+    <div class="modal-foot" style="border:none;flex-direction:column;gap:8px;">
       <button class="btn btn-gold" id="lgSubmit" style="width:100%;justify-content:center;">Đăng nhập</button>
+      <button class="btn-plain-text" id="lgForgot" type="button">Quên mật khẩu?</button>
     </div>
   </div>
 </div>
@@ -615,7 +617,6 @@
   var BPYC_LIST = ["BD","Sales","MKT","Distribution","F&B","IT","Technical","OPS","HR","Legal","Finance"];
   var STATUSES = ["Chưa bắt đầu","Đang xử lý","Hoàn thành","Hủy"];
   var CHIP_PALETTE = ["chip-0","chip-1","chip-2","chip-3","chip-4","chip-5","chip-6","chip-7"];
-  var LS_USER = "scm_report_me";
   var LS_LOCAL_DATA = "scm_report_local";
 
   /* ================= STATE ================= */
@@ -624,8 +625,9 @@
     members: [],
     config: { soonDays: 4, savingTarget: 5 },
     me: null,
+    authUser: null,
     isAdmin: false,
-    adminChecked: false,
+    canEdit: false,
     dbReady: false,
     tab: "board",
     editingId: null,
@@ -634,6 +636,9 @@
     sort: { key:"due_date", dir:"asc" }
   };
   var db = null;
+  var auth = null;
+  var unsubs = [];
+  var accessSynced = false;
 
   /* ================= SMALL HELPERS ================= */
   function $(id){ return document.getElementById(id); }
@@ -736,19 +741,6 @@
     });
   }
 
-  /* ---- băm mật khẩu ---- */
-  function randomSalt(){
-    var a=new Uint8Array(12);
-    (window.crypto||window.msCrypto).getRandomValues(a);
-    return Array.from(a).map(function(b){return b.toString(16).padStart(2,"0");}).join("");
-  }
-  function hashPass(salt, pass){
-    var enc=new TextEncoder().encode(salt+"|scm|"+pass);
-    return crypto.subtle.digest("SHA-256",enc).then(function(buf){
-      return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,"0");}).join("");
-    });
-  }
-
   /* ================= DOMAIN LOGIC ================= */
   function savingOf(t){
     var hb = t.budget!==""&&t.budget!==null&&t.budget!==undefined;
@@ -819,11 +811,32 @@
     localSave(); renderAll();
     return Promise.resolve();
   }
+  /* Danh sách email được phép vào app. Firestore Rules đọc tài liệu này để quyết định quyền. */
+  function accessDoc(){
+    var withEmail = state.members.filter(function(m){ return normEmail(m.email); });
+    function pick(fn){ return withEmail.filter(fn).map(function(m){ return normEmail(m.email); }); }
+    return {
+      emails: pick(function(){ return true; }),
+      admins: pick(function(m){ return m.role==="admin"; }),
+      viewers: pick(function(m){ return m.role==="viewer"; })
+    };
+  }
+  function cleanMembers(){
+    return state.members.map(function(m){
+      var o=Object.assign({},m);
+      delete o.salt; delete o.hash; delete o.username;   /* bỏ mật khẩu kiểu cũ */
+      if(o.email) o.email=normEmail(o.email);
+      return o;
+    });
+  }
   function saveMembers(){
     if(db){
-      return db.doc("system/members").set({list:state.members}).catch(function(e){
+      var batch = db.batch();
+      batch.set(db.doc("system/members"), {list:cleanMembers()});
+      batch.set(db.doc("system/access"), accessDoc());
+      return batch.commit().catch(function(e){
         console.error(e);
-        showToast(e&&e.code==="invalid_argument"
+        showToast(e&&e.code==="permission-denied"
           ? "Bạn không có quyền quản trị để sửa danh sách thành viên."
           : "Không lưu được danh sách thành viên.");
         throw e;
@@ -832,11 +845,24 @@
     localSave(); renderAll();
     return Promise.resolve();
   }
+  /* Admin đăng nhập lần đầu sau khi nâng cấp: tự tạo/cập nhật system/access và xoá mật khẩu kiểu cũ. */
+  function syncAccessIfAdmin(){
+    if(accessSynced || !db || !state.isAdmin) return;
+    accessSynced = true;
+    var hasLegacy = state.members.some(function(m){ return m.hash||m.salt||m.username; });
+    db.doc("system/access").get().then(function(snap){
+      var want = accessDoc(), have = snap.exists ? snap.data() : null;
+      var same = have && JSON.stringify(have.emails)===JSON.stringify(want.emails) &&
+                 JSON.stringify(have.admins)===JSON.stringify(want.admins) &&
+                 JSON.stringify(have.viewers||[])===JSON.stringify(want.viewers);
+      if(!same || hasLegacy) return saveMembers();
+    }).catch(function(e){ console.error("sync access:",e); });
+  }
   function saveConfig(){
     if(db){
       return db.doc("system/config").set(state.config).catch(function(e){
         console.error(e);
-        showToast(e&&e.code==="invalid_argument"
+        showToast(e&&e.code==="permission-denied"
           ? "Bạn không có quyền quản trị để đổi cấu hình."
           : "Không lưu được cấu hình.");
         throw e;
@@ -959,10 +985,10 @@
         '<td class="num">'+fmtDate(t.due_date)+'</td>'+
         '<td><span class="badge '+u.cls+'">'+u.label+'</span></td>'+
         '<td class="num">'+fmtDate(t.complete_date)+'</td>'+
-        '<td><div class="row-actions">'+
+        '<td><div class="row-actions">'+(state.canEdit ?
           '<button class="btn-plain-text" data-act="edit" data-id="'+esc(t.id)+'">Sửa</button>'+
           '<button class="btn-plain-text" data-act="dup" data-id="'+esc(t.id)+'">Nhân bản</button>'+
-          '<button class="btn-danger-text" data-act="del" data-id="'+esc(t.id)+'">Xoá</button>'+
+          '<button class="btn-danger-text" data-act="del" data-id="'+esc(t.id)+'">Xoá</button>' : '')+
         '</div></td></tr>';
     }).join("");
 
@@ -982,12 +1008,16 @@
   /* ================= RENDER: WHO ================= */
   function renderWho(){
     var el = $("whoAmI");
+    $("btnLogout").hidden = !state.me;
+    $("btnNew").disabled = !state.canEdit;
+    $("btnExport").disabled = state.dbReady && !state.me;
+    document.querySelector('.tab[data-tab="admin"]').hidden = state.dbReady && !state.isAdmin;
     if(!state.me){
-      el.innerHTML = '<span style="color:#B7BDD6;">Chưa chọn người dùng</span>';
+      el.innerHTML = state.dbReady ? '<span style="color:#B7BDD6;">Chưa đăng nhập</span>' : '<span style="color:#B7BDD6;">Ngoại tuyến</span>';
       return;
     }
     var roleLabel = state.isAdmin ? "Admin" : (state.me.role==="viewer" ? "Chỉ xem" : "Thành viên");
-    el.innerHTML = '<span>Xin chào</span><b>'+esc(state.me.name)+'</b>'+
+    el.innerHTML = '<b>'+esc(state.me.name)+'</b>'+
       '<span class="role-tag'+(state.isAdmin?"":" member")+'">'+roleLabel+'</span>';
   }
   /* ================= ANALYTICS ================= */
@@ -1344,17 +1374,15 @@
     var banner = $("adminBanner");
     if(!state.dbReady){
       banner.className = "banner banner-warn";
-      banner.innerHTML = "<div><b>Chế độ ngoại tuyến.</b> Trang đang chạy không có máy chủ dữ liệu — mọi thay đổi chỉ lưu trên trình duyệt này. "+
-        "Hãy mở app qua đường link đã publish để dùng database dùng chung.</div>";
+      banner.innerHTML = "<div><b>Chế độ ngoại tuyến.</b> Trang đang chạy không có máy chủ dữ liệu — mọi thay đổi chỉ lưu trên trình duyệt này.</div>";
     } else if(state.isAdmin){
       banner.className = "banner banner-info";
-      banner.innerHTML = "<div><b>Bạn đang có quyền Admin.</b> Quyền này đến từ mức chia sẻ <i>Can edit</i> của link app. "+
-        "Để cấp quyền admin cho người khác, dùng nút <b>Share</b> của artifact và chọn <i>Can edit</i>; "+
-        "người chỉ được <i>Can view</i> vẫn tạo và sửa task bình thường nhưng không đổi được danh sách thành viên và cấu hình.</div>";
+      banner.innerHTML = "<div><b>Bạn là Admin.</b> Chỉ những email có trong danh sách dưới đây mới đăng nhập được. "+
+        "Vai trò <i>Chỉ xem</i> xem được báo cáo nhưng không tạo hay sửa task.</div>";
     } else {
       banner.className = "banner banner-warn";
-      banner.innerHTML = "<div><b>Bạn đang ở quyền Thành viên.</b> Bạn tạo và cập nhật task bình thường, nhưng không sửa được "+
-        "danh sách thành viên và cấu hình cảnh báo. Liên hệ admin (người sở hữu link) nếu cần cấp quyền.</div>";
+      banner.innerHTML = "<div><b>Bạn đang ở quyền "+(state.canEdit?"Thành viên":"Chỉ xem")+".</b> "+
+        "Chỉ Admin sửa được danh sách thành viên và cấu hình cảnh báo.</div>";
     }
 
     var list = $("memberList");
@@ -1381,7 +1409,7 @@
     $("cfgSoonDays").value = state.config.soonDays;
     $("cfgSavingTarget").value = state.config.savingTarget;
     var canAdmin = state.isAdmin || !state.dbReady;
-    ["btnAddMember","cfgSoonDays","cfgSavingTarget","btnSaveCfg","btnImport","btnSeed"].forEach(function(id){
+    ["btnAddMember","cfgSoonDays","cfgSavingTarget","btnSaveCfg","btnImport"].forEach(function(id){
       $(id).disabled = !canAdmin;
     });
   }
@@ -1486,130 +1514,129 @@
     $("mbEmail").value = m?(m.email||""):"";
     $("mbRole").value = m?(m.role||"member"):"member";
     $("mbNote").value = m?(m.note||""):"";
-    $("mbUser").value = m?(m.username||""):"";
     $("mbPass").value = "";
-    $("mbPassLabel").textContent = (m&&m.hash) ? "Mật khẩu (để trống nếu giữ nguyên)" : "Mật khẩu";
+    var online = !!(db && auth);
+    $("mbPassWrap").hidden = !online || !!m;
+    $("mbReset").hidden = !online || !m || !m.email;
+    $("mbHint").textContent = !online ? "" : (m
+      ? "Mật khẩu do từng người tự đổi. Bấm nút bên dưới để gửi email đặt lại mật khẩu cho người này."
+      : "Hệ thống tạo tài khoản đăng nhập bằng email này. Gửi mật khẩu ban đầu cho người đó qua kênh riêng và nhắc họ đổi sau lần đăng nhập đầu.");
     $("memberOverlay").hidden=false;
     $("mbName").focus();
   }
   function closeMember(){ $("memberOverlay").hidden=true; state.editingMemberId=null; }
   function saveMember(){
     var name=$("mbName").value.trim();
-    if(!name){ showToast("Vui lòng nhập họ tên"); return; }
-    var username=$("mbUser").value.trim().toLowerCase();
+    var email=normEmail($("mbEmail").value);
     var pass=$("mbPass").value;
     var m = state.editingMemberId ? state.members.find(function(x){return x.id===state.editingMemberId;}) : null;
-    if(username){
-      var dup=state.members.filter(function(x){
-        return (x.username||"").toLowerCase()===username && (!m||x.id!==m.id);
-      });
-      if(dup.length){ showToast("Tên đăng nhập đã tồn tại"); return; }
+    if(!name){ showToast("Nhập họ tên thành viên."); return; }
+    if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ showToast("Nhập email công ty hợp lệ — email này dùng để đăng nhập."); return; }
+    var dup=state.members.some(function(x){ return normEmail(x.email)===email && (!m||x.id!==m.id); });
+    if(dup){ showToast("Email này đã có trong danh sách thành viên."); return; }
+    var needAccount = !m && db && auth;
+    if(needAccount && pass.length<8){ showToast("Đặt mật khẩu ban đầu tối thiểu 8 ký tự."); return; }
+    if(m && m.id===(state.me&&state.me.id) && m.role==="admin" && $("mbRole").value!=="admin" &&
+       state.members.filter(function(x){return x.role==="admin";}).length<=1){
+      showToast("Bạn là admin duy nhất. Thêm một admin khác trước khi đổi vai trò của mình."); return;
     }
-    if(pass && pass.length<6){ showToast("Mật khẩu tối thiểu 6 ký tự"); return; }
-    if(!m && username && !pass){ showToast("Đặt mật khẩu cho tài khoản mới"); return; }
 
-    var target = m || { id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,5) };
-    target.name=name; target.email=$("mbEmail").value.trim();
-    target.role=$("mbRole").value; target.note=$("mbNote").value.trim();
-    target.username=username;
-
-    var step = Promise.resolve();
-    if(pass){
-      var salt=randomSalt();
-      step = hashPass(salt,pass).then(function(h){ target.salt=salt; target.hash=h; });
-    }
-    step.then(function(){
+    $("mbSave").disabled=true;
+    var step = needAccount ? createAuthAccount(email, pass) : Promise.resolve(null);
+    step.then(function(res){
+      var target = m || { id:"m"+Date.now().toString(36)+Math.random().toString(36).slice(2,5) };
+      target.name=name; target.email=email;
+      target.role=$("mbRole").value; target.note=$("mbNote").value.trim();
       if(!m) state.members.push(target);
-      return saveMembers();
-    }).then(function(){
-      showToast("Đã lưu thành viên"); closeMember();
-      if(state.me && state.me.id===target.id) state.me=target;
-      renderAll();
-    }).catch(function(){ closeMember(); });
+      return saveMembers().then(function(){
+        showToast(res==="exists" ? "Đã thêm. Email này đã có tài khoản đăng nhập từ trước — người đó dùng mật khẩu cũ."
+                                 : "Đã lưu thành viên");
+        closeMember();
+        if(state.me && state.me.id===target.id){ state.me=target; resolveRole(); }
+        renderAll();
+      });
+    }).catch(function(e){
+      console.error(e);
+      if(e && e.code && e.code.indexOf("auth/")===0) showToast(e.code==="auth/weak-password" ? "Mật khẩu quá yếu." : authMsg(e));
+    }).then(function(){ $("mbSave").disabled=false; });
+  }
+  function sendResetFor(){
+    var email=normEmail($("mbEmail").value);
+    if(!email||!auth) return;
+    auth.sendPasswordResetEmail(email)
+      .then(function(){ showToast("Đã gửi email đặt lại mật khẩu tới "+email); })
+      .catch(function(e){ showToast(authMsg(e)); });
   }
   function deleteMember(id){
     var m=state.members.find(function(x){return x.id===id;});
     if(!m) return;
-    if(!confirm('Xoá "'+m.name+'" khỏi danh sách thành viên? Các task đã gán cho người này vẫn giữ nguyên tên PIC.')) return;
+    if(state.me && m.id===state.me.id){ showToast("Bạn không thể tự xoá chính mình."); return; }
+    if(!confirm('Xoá "'+m.name+'" khỏi danh sách thành viên? Người này sẽ không vào được app nữa. Các task đã gán vẫn giữ nguyên tên PIC.')) return;
     state.members = state.members.filter(function(x){return x.id!==id;});
     saveMembers().then(function(){ showToast("Đã xoá thành viên"); }).catch(function(){});
   }
 
-  /* ================= AUTH ================= */
-  function hasAccounts(){
-    return state.members.some(function(m){ return m.username && m.hash; });
+  /* ================= AUTH (Firebase Authentication) ================= */
+  var AUTH_MSG = {
+    "auth/invalid-credential":"Sai email hoặc mật khẩu.",
+    "auth/invalid-login-credentials":"Sai email hoặc mật khẩu.",
+    "auth/wrong-password":"Sai email hoặc mật khẩu.",
+    "auth/user-not-found":"Sai email hoặc mật khẩu.",
+    "auth/invalid-email":"Email không hợp lệ.",
+    "auth/user-disabled":"Tài khoản này đã bị khoá. Liên hệ admin.",
+    "auth/too-many-requests":"Đăng nhập sai quá nhiều lần. Đợi vài phút hoặc bấm Quên mật khẩu.",
+    "auth/network-request-failed":"Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.",
+    "auth/operation-not-allowed":"Hệ thống chưa bật đăng nhập bằng email. Admin cần bật Email/Password trong Firebase Authentication."
+  };
+  function authMsg(err){ return AUTH_MSG[err&&err.code] || ("Không đăng nhập được ("+(err&&err.code||"lỗi")+")."); }
+  function normEmail(e){ return String(e||"").trim().toLowerCase(); }
+  function memberByEmail(email){
+    var e=normEmail(email);
+    if(!e) return null;
+    return state.members.find(function(m){ return normEmail(m.email)===e; }) || null;
   }
-  function showLogin(){
-    var setup = !hasAccounts();
+  function showLogin(msg){
     $("loginOverlay").hidden=false;
-    $("lgNameWrap").hidden = !setup;
-    $("lgError").hidden=true;
-    $("lgSubmit").textContent = setup ? "Tạo tài khoản quản trị" : "Đăng nhập";
-    $("lgPassLabel").textContent = setup ? "Mật khẩu (tối thiểu 6 ký tự)" : "Mật khẩu";
-    $("loginIntro").innerHTML = setup
-      ? "Chưa có tài khoản nào. Hãy tạo <b>tài khoản quản trị chính</b> — tài khoản này sẽ quản lý thành viên, cấu hình và toàn bộ dữ liệu."
-      : "Đăng nhập để vào hệ thống quản lý task mua hàng.";
-    $("lgUser").value=""; $("lgPass").value=""; $("lgName").value="";
-    setTimeout(function(){ $("lgUser").focus(); },50);
+    $("lgError").hidden=true; $("lgInfo").hidden=true;
+    $("loginIntro").textContent = "Đăng nhập bằng email công ty để vào hệ thống theo dõi task mua hàng.";
+    $("lgPass").value="";
+    if(msg) loginError(msg);
+    setTimeout(function(){ ($("lgUser").value?$("lgPass"):$("lgUser")).focus(); },50);
   }
-  function loginError(msg){
-    var e=$("lgError"); e.textContent=msg; e.hidden=false;
-  }
+  function hideLogin(){ $("loginOverlay").hidden=true; }
+  function loginError(msg){ var e=$("lgError"); e.textContent=msg; e.hidden=false; $("lgInfo").hidden=true; }
+  function loginInfo(msg){ var e=$("lgInfo"); e.textContent=msg; e.hidden=false; $("lgError").hidden=true; }
   function doLogin(){
-    var u=$("lgUser").value.trim().toLowerCase();
-    var pw=$("lgPass").value;
-    if(!u||!pw){ loginError("Nhập đủ tên đăng nhập và mật khẩu."); return; }
+    var u=normEmail($("lgUser").value), pw=$("lgPass").value;
+    if(!u||!pw){ loginError("Nhập đủ email và mật khẩu."); return; }
+    if(!auth){ loginError("Chưa kết nối được máy chủ xác thực. Tải lại trang rồi thử lại."); return; }
     $("lgSubmit").disabled=true;
-
-    if(!hasAccounts()){
-      var nm=$("lgName").value.trim()||u;
-      if(pw.length<6){ loginError("Mật khẩu tối thiểu 6 ký tự."); $("lgSubmit").disabled=false; return; }
-      var salt=randomSalt();
-      hashPass(salt,pw).then(function(h){
-        var acc={ id:"m"+Date.now().toString(36), name:nm, username:u, salt:salt, hash:h,
-                  role:"admin", email:"", note:"Tài khoản quản trị chính" };
-        state.members.push(acc);
-        return saveMembers().then(function(){
-          state.me=acc;
-          try{ localStorage.setItem(LS_USER, acc.id); }catch(e){}
-          $("loginOverlay").hidden=true;
-          showToast("Đã tạo tài khoản quản trị. Xin chào "+nm);
-          renderAll();
-        });
-      }).catch(function(err){
-        console.error(err);
-        loginError("Không tạo được tài khoản. Bạn cần quyền chỉnh sửa (Can edit) trên link app này.");
-      }).then(function(){ $("lgSubmit").disabled=false; });
-      return;
-    }
-
-    var acc2=state.members.find(function(m){ return (m.username||"").toLowerCase()===u && m.hash; });
-    if(!acc2){ loginError("Sai tên đăng nhập hoặc mật khẩu."); $("lgSubmit").disabled=false; return; }
-    hashPass(acc2.salt||"", pw).then(function(h){
-      if(h!==acc2.hash){ loginError("Sai tên đăng nhập hoặc mật khẩu."); return; }
-      state.me=acc2;
-      try{ localStorage.setItem(LS_USER, acc2.id); }catch(e){}
-      $("loginOverlay").hidden=true;
-      showToast("Xin chào "+acc2.name);
-      renderAll();
-    }).catch(function(){ loginError("Lỗi xác thực, thử lại."); })
+    auth.signInWithEmailAndPassword(u,pw)
+      .catch(function(e){ loginError(authMsg(e)); })
       .then(function(){ $("lgSubmit").disabled=false; });
   }
-  function doLogout(){
-    state.me=null;
-    try{ localStorage.removeItem(LS_USER); }catch(e){}
-    renderAll();
-    showLogin();
+  function doForgot(){
+    var u=normEmail($("lgUser").value);
+    if(!u){ loginError("Nhập email công ty vào ô Email, rồi bấm Quên mật khẩu."); return; }
+    if(!auth){ loginError("Chưa kết nối được máy chủ xác thực."); return; }
+    var ok="Nếu "+u+" có tài khoản, email hướng dẫn đặt lại mật khẩu đã được gửi. Kiểm tra cả mục Spam.";
+    auth.sendPasswordResetEmail(u).then(function(){ loginInfo(ok); })
+      .catch(function(e){ if(e&&e.code==="auth/invalid-email") loginError("Email không hợp lệ."); else loginInfo(ok); });
   }
-  function restoreMe(){
-    var id=null;
-    try{ id=localStorage.getItem(LS_USER); }catch(e){}
-    if(id){ state.me = state.members.find(function(x){return x.id===id;}) || null; }
-    if(state.me && !state.me.hash) state.me=null;
-    if(!$("loginOverlay").hidden || !state.me){
-      if(state.me) $("loginOverlay").hidden=true;
-      else showLogin();
-    }
+  function doLogout(){ if(auth) auth.signOut(); else { state.me=null; renderAll(); } }
+
+  /* Tạo tài khoản đăng nhập cho thành viên mới mà không làm admin bị đăng xuất:
+     dùng một app Firebase phụ để gọi createUser. */
+  function createAuthAccount(email, pass){
+    var sec = (firebase.apps||[]).find(function(a){ return a.name==="member-creator"; }) ||
+              firebase.initializeApp(FIREBASE_CONFIG, "member-creator");
+    return sec.auth().createUserWithEmailAndPassword(email, pass)
+      .then(function(){ return sec.auth().signOut(); })
+      .then(function(){ return "created"; })
+      .catch(function(e){
+        if(e && e.code==="auth/email-already-in-use") return "exists";
+        throw e;
+      });
   }
 
   /* ================= EXCEL ================= */
@@ -1695,32 +1722,9 @@
     reader.readAsArrayBuffer(file);
   }
 
-  function seedSamples(){
-    var today=todayISO();
-    var samples=[
-      {item:"Thuê gian hàng sự kiện ra mắt phim Quý 4", bpyc:"MKT", requester:"Mkt Team", pic:state.me?state.me.name:"Ruby",
-       budget:140000000, accept:132000000, supplier:"ABC Events Co.", pr_date:addDaysISO(today,-5),
-       due_date:addDaysISO(today,2), status:"Đang xử lý", complete_date:"", note:"Chờ NCC gửi bản vẽ 3D gian hàng."},
-      {item:"Gia hạn hợp đồng vệ sinh cụm rạp khu vực Nam", bpyc:"OPS", requester:"Facility Mgmt", pic:state.me?state.me.name:"Ruby",
-       budget:75000000, accept:75000000, supplier:"CleanPro Services", pr_date:addDaysISO(today,-10),
-       due_date:addDaysISO(today,-2), status:"Đang xử lý", complete_date:"", note:"Cần chốt trước khi hợp đồng cũ hết hạn."},
-      {item:"Mua thiết bị chiếu sáng cho dự án cải tạo rạp mới", bpyc:"Technical", requester:"Project Dept", pic:"Team Purchasing",
-       budget:470000000, accept:"", supplier:"LightTech JSC", pr_date:addDaysISO(today,-1),
-       due_date:addDaysISO(today,15), status:"Chưa bắt đầu", complete_date:"", note:"Chờ duyệt ngân sách bổ sung."},
-      {item:"Đặt in ấn banner quảng bá khai trương", bpyc:"Sales", requester:"Mkt Team", pic:state.me?state.me.name:"Ruby",
-       budget:28000000, accept:26500000, supplier:"PrintFast", pr_date:addDaysISO(today,-20),
-       due_date:addDaysISO(today,-15), status:"Hoàn thành", complete_date:addDaysISO(today,-16), note:"Đã bàn giao đủ số lượng."}
-    ];
-    var chain=Promise.resolve();
-    samples.forEach(function(s){
-      var t=Object.assign({id:uid(), cancel_reason:"", urgent_override:false,
-        created_at:todayISO(), updated_at:todayISO(), updated_by:state.me?state.me.name:""}, s);
-      chain=chain.then(function(){ return saveTask(t); });
-    });
-    chain.then(function(){ showToast("Đã tạo 4 task mẫu"); });
-  }
   /* ================= EVENTS ================= */
   function switchTab(name){
+    if(name==="admin" && state.dbReady && !state.isAdmin) name="board";
     state.tab=name;
     ["board","overview","admin"].forEach(function(n){
       $("tab-"+n).hidden = (n!==name);
@@ -1729,7 +1733,7 @@
       b.classList.toggle("active", b.dataset.tab===name);
     });
     if(name==="overview") renderOverview();
-    if(name==="admin"){ renderAdmin(); ensureAdminChecked(); }
+    if(name==="admin") renderAdmin();
   }
 
   function bindEvents(){
@@ -1756,7 +1760,9 @@
 
     $("btnLogout").onclick=doLogout;
     $("lgSubmit").onclick=doLogin;
-    ["lgUser","lgPass","lgName"].forEach(function(id){
+    $("lgForgot").onclick=doForgot;
+    $("mbReset").onclick=sendResetFor;
+    ["lgUser","lgPass"].forEach(function(id){
       $(id).addEventListener("keydown",function(e){ if(e.key==="Enter") doLogin(); });
     });
 
@@ -1772,7 +1778,6 @@
 
     $("btnExport").onclick=exportExcel;
     $("btnImport").onclick=importExcel;
-    $("btnSeed").onclick=seedSamples;
     $("btnSaveCfg").onclick=function(){
       var d=Number($("cfgSoonDays").value)||4;
       var s=Number($("cfgSavingTarget").value);
@@ -1809,18 +1814,6 @@
     $("ovYear").addEventListener("change",renderOverview);
   }
 
-  /* ================= ADMIN PROBE ================= */
-  var adminProbe=null;
-  function ensureAdminChecked(){
-    if(adminProbe) return adminProbe;
-    if(!db){ state.isAdmin=true; state.adminChecked=true; renderWho(); renderAdmin(); return Promise.resolve(true); }
-    adminProbe = db.doc("system/access_probe").set({ probe:true })
-      .then(function(){ state.isAdmin=true; })
-      .catch(function(){ state.isAdmin=false; })
-      .then(function(){ state.adminChecked=true; renderWho(); renderAdmin(); return state.isAdmin; });
-    return adminProbe;
-  }
-
   /* ================= BOOT ================= */
   function showOfflineBanner(){
     var b=$("dbBanner");
@@ -1841,67 +1834,114 @@
         return Promise.resolve(firebase.firestore());
       }catch(e){ console.error("Firebase init:",e); }
     }
-    /* 2) Mở trong artifact của Claude -> dùng db dùng chung của Claude */
-    if(window.claude && typeof window.claude.use==="function"){
-      return window.claude.use("db").catch(function(){ return null; });
-    }
-    /* 3) Không có gì -> lưu tạm trên trình duyệt này */
+    /* 2) Không có cấu hình -> lưu tạm trên trình duyệt này */
     return Promise.resolve(null);
   }
 
+  /* Quyền lấy từ danh sách thành viên theo email đăng nhập */
+  function resolveRole(){
+    var u = state.authUser;
+    state.me = u ? memberByEmail(u.email) : null;
+    state.isAdmin = !!(state.me && state.me.role==="admin");
+    state.canEdit = !!(state.me && state.me.role!=="viewer");
+  }
+  function stopListening(){
+    unsubs.forEach(function(f){ try{ f(); }catch(e){} });
+    unsubs = [];
+  }
+  function onDataError(where){
+    return function(err){
+      console.error(where+":",err);
+      if(err && err.code==="permission-denied"){
+        stopListening();
+        var who = state.authUser ? state.authUser.email : "";
+        if(auth) auth.signOut();
+        showLogin("Tài khoản "+who+" chưa được cấp quyền vào SCM-report. Liên hệ admin để được thêm vào danh sách thành viên.");
+        return;
+      }
+      showToast("Mất kết nối dữ liệu ("+(err&&err.code||"lỗi")+")");
+    };
+  }
   function subscribe(){
-    db.collection("tasks").onSnapshot(function(snap){
-      state.tasks = snap.docs.map(function(d){
-        var o = Object.assign({}, d.data()||{});
-        o.id = d.id;
-        return o;
-      });
-      renderAll();
-    }, function(err){
-      console.error("tasks:",err);
-      showToast("Mất kết nối dữ liệu task ("+(err&&err.code||"lỗi")+")");
-    });
-
-    db.doc("system/members").onSnapshot(function(snap){
+    stopListening();
+    var membersLoaded=false;
+    unsubs.push(db.doc("system/members").onSnapshot(function(snap){
       var d = snap.exists ? snap.data() : null;
       state.members = (d && Array.isArray(d.list)) ? d.list.map(function(m){ return Object.assign({},m); }) : [];
-      restoreMe();
-      renderAll();
-    }, function(err){ console.error("members:",err); });
-
-    db.doc("system/config").onSnapshot(function(snap){
-      if(snap.exists){
-        var d = Object.assign({}, snap.data()||{});
-        state.config = {
-          soonDays: Number(d.soonDays)||4,
-          savingTarget: (d.savingTarget===undefined||d.savingTarget===null)?5:Number(d.savingTarget)
-        };
+      resolveRole();
+      if(!state.me){
+        var who = state.authUser ? state.authUser.email : "";
+        stopListening();
+        if(auth) auth.signOut();
+        showLogin("Tài khoản "+who+" chưa có trong danh sách thành viên. Liên hệ admin để được thêm.");
+        return;
       }
+      if(!membersLoaded){
+        membersLoaded=true;
+        unsubs.push(db.collection("tasks").onSnapshot(function(qs){
+          state.tasks = qs.docs.map(function(dd){
+            var o = Object.assign({}, dd.data()||{});
+            o.id = dd.id;
+            return o;
+          });
+          renderAll();
+        }, onDataError("tasks")));
+        unsubs.push(db.doc("system/config").onSnapshot(function(cs){
+          if(cs.exists){
+            var c = Object.assign({}, cs.data()||{});
+            state.config = {
+              soonDays: Number(c.soonDays)||4,
+              savingTarget: (c.savingTarget===undefined||c.savingTarget===null)?5:Number(c.savingTarget)
+            };
+          }
+          renderAll();
+        }, onDataError("config")));
+      }
+      syncAccessIfAdmin();
       renderAll();
-    }, function(err){ console.error("config:",err); });
+    }, onDataError("members")));
+  }
+
+  function setLoadingRow(text){
+    $("emptyState").hidden=true;
+    $("taskBody").innerHTML='<tr><td colspan="13" style="padding:30px;text-align:center;color:var(--ink-faint);">'+esc(text)+'</td></tr>';
   }
 
   function boot(){
     bindEvents();
     $("ovMonth").value = todayISO().slice(0,7);
-    $("taskBody").innerHTML='<tr><td colspan="13" style="padding:30px;text-align:center;color:var(--ink-faint);">Đang kết nối máy chủ dữ liệu…</td></tr>';
+    setLoadingRow("Đang kết nối máy chủ dữ liệu…");
     renderStats(); renderWho();
 
     connectDb().then(function(handle){
       if(!handle){
+        /* Chế độ ngoại tuyến: không có máy chủ, dữ liệu chỉ nằm trên trình duyệt này */
         state.dbReady=false;
-        state.isAdmin=true;
+        state.isAdmin=true; state.canEdit=true;
         showOfflineBanner();
-        localLoad(); renderAll(); restoreMe();
-        if(!state.tasks.length){
-          $("taskBody").innerHTML="";
-          $("emptyState").hidden=false;
-        }
+        localLoad(); renderAll();
+        if(!state.tasks.length){ $("taskBody").innerHTML=""; $("emptyState").hidden=false; }
         return;
       }
       db=handle; state.dbReady=true;
-      subscribe();
-      ensureAdminChecked();
+      auth = firebase.auth();
+      /* Chưa đăng nhập thì không đọc bất kỳ dữ liệu nào */
+      auth.onAuthStateChanged(function(user){
+        stopListening();
+        accessSynced=false;
+        state.authUser=user||null;
+        state.tasks=[]; state.members=[]; state.me=null; state.isAdmin=false; state.canEdit=false;
+        if(!user){
+          setLoadingRow("Đăng nhập để xem dữ liệu.");
+          renderStats(); renderWho();
+          showLogin();
+          return;
+        }
+        hideLogin();
+        setLoadingRow("Đang tải dữ liệu…");
+        renderWho();
+        subscribe();
+      });
     });
   }
 
