@@ -880,7 +880,8 @@
   function cleanMembers(){
     return state.members.map(function(m){
       var o=Object.assign({},m);
-      delete o.salt; delete o.hash; delete o.username;   /* bỏ mật khẩu kiểu cũ */
+      /* Giữ lại salt/hash/username kiểu cũ để bản cũ vẫn đăng nhập được trong lúc chuyển đổi.
+         Xoá các trường này sau khi đã bật Firestore Rules (xem HUONG-DAN-BAO-MAT.md). */
       if(o.email) o.email=normEmail(o.email);
       return o;
     });
@@ -905,13 +906,12 @@
   function syncAccessIfAdmin(){
     if(accessSynced || !db || !state.isAdmin) return;
     accessSynced = true;
-    var hasLegacy = state.members.some(function(m){ return m.hash||m.salt||m.username; });
     db.doc("system/access").get().then(function(snap){
       var want = accessDoc(), have = snap.exists ? snap.data() : null;
       var same = have && JSON.stringify(have.emails)===JSON.stringify(want.emails) &&
                  JSON.stringify(have.admins)===JSON.stringify(want.admins) &&
                  JSON.stringify(have.viewers||[])===JSON.stringify(want.viewers);
-      if(!same || hasLegacy) return saveMembers();
+      if(!same) return saveMembers();
     }).catch(function(e){ console.error("sync access:",e); });
   }
   function saveConfig(){

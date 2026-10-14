@@ -18,15 +18,19 @@ Firebase Console → **Authentication** → tab **Users** → **Add user**. Nh�
 
 Sau khi bản mới chạy, Admin có thể thêm thành viên mới ngay trong app (tab Quản trị) — app tự tạo tài khoản đăng nhập. Mỗi người tự đổi mật khẩu bằng nút **Quên mật khẩu?** ở màn đăng nhập.
 
+## Lưu ý về link xem thử (Preview)
+
+Link xem thử của nhánh dùng **chung Firebase với trang chính**: mọi task tạo/sửa trên đó là dữ liệu thật. Chỉ xem và thử đăng nhập; đừng tạo task thử.
+
 ## Bước 4 — Deploy bản mới
 
 Gộp nhánh `fix/bao-mat-va-so-lieu` vào `main`. Vercel tự deploy.
 
 ## Bước 5 — Admin đăng nhập một lần
 
-Admin mở app, đăng nhập bằng email + mật khẩu ở Bước 3. App sẽ tự:
-- tạo tài liệu `system/access` (danh sách email được vào, admin, chỉ xem), và
-- xoá mật khẩu kiểu cũ (salt/hash) khỏi `system/members`.
+Admin mở app, đăng nhập bằng email + mật khẩu ở Bước 3. App sẽ tự tạo tài liệu `system/access` (danh sách email được vào, admin, chỉ xem).
+
+Mật khẩu kiểu cũ (salt/hash/username) vẫn được giữ trong `system/members` để bản cũ không bị khoá nếu cần quay lại. Sau khi bật Rules ở Bước 6 và mọi người đã đăng nhập được, xoá các trường này: Firestore Database → `system/members` → sửa từng phần tử trong `list`, xoá `salt`, `hash`, `username`.
 
 Kiểm tra: Firebase Console → **Firestore Database** → collection `system` → phải có document `access` chứa đúng các email.
 
