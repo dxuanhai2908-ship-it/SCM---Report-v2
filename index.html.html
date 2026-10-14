@@ -71,6 +71,8 @@
   .topbar-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;}
   .who{font-size:12.5px;color:#D7D0E8;display:flex;align-items:center;gap:7px;}
   .who b{color:#fff;font-weight:600;}
+  .stat-click{cursor:pointer;transition:border-color .12s ease;}
+  .stat-click:hover,.stat-click:focus-visible{border-color:var(--navy-2);outline:none;}
   .who-box{display:flex;align-items:center;gap:9px;padding-left:12px;margin-left:4px;border-left:1px solid rgba(255,255,255,.18);}
   .btn:disabled{opacity:.45;cursor:not-allowed;}
     .role-tag{background:rgba(247,203,166,.25);color:#F7CBA6;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:600;}
@@ -347,7 +349,7 @@
       <div class="field"><label>PIC</label><select id="fPic"><option value="">Tất cả</option></select></div>
       <div class="field"><label>Nhà cung cấp</label><select id="fSupplier"><option value="">Tất cả</option></select></div>
       <div class="field"><label>Trạng thái</label><select id="fStatus">
-        <option value="">Tất cả</option>
+        <option value="">Tất cả</option><option value="__open">Đang mở (chưa xong)</option>
         <option>Chưa bắt đầu</option><option>Đang xử lý</option><option>Hoàn thành</option><option>Hủy</option>
       </select></div>
       <div class="field"><label>Ưu tiên</label><select id="fPriority">
@@ -399,7 +401,7 @@
       <div class="panel-head">
         <div>
           <h3 class="panel-title">Tổng quan theo tháng</h3>
-          <div class="panel-hint">Task được xếp vào tháng theo <b>Ngày PR</b>. Task "Hủy" không tính vào saving và tỷ lệ đúng hạn.</div>
+          <div class="panel-hint">Task được xếp vào tháng theo <b>Ngày PR</b> (thiếu Ngày PR thì theo Hạn giao). Task "Hủy" không tính vào saving và tỷ lệ đúng hạn.</div>
         </div>
         <div style="display:flex;gap:9px;align-items:flex-end;flex-wrap:wrap;">
           <div class="field"><label>Tháng phân tích</label><input type="month" id="ovMonth"></div>
@@ -419,7 +421,7 @@
       </div>
       <div class="panel">
         <div class="panel-head"><div><h3 class="panel-title">Ngân sách &amp; Saving theo tháng</h3>
-          <div class="panel-hint">Đơn vị: triệu đồng (trước VAT)</div></div></div>
+          <div class="panel-hint">Triệu đồng, trước VAT · chỉ gồm task có đủ ngân sách và giá duyệt</div></div></div>
         <div class="chart-wrap"><svg class="chart" id="chartMoney" viewBox="0 0 700 260" role="img" aria-label="Biểu đồ ngân sách và saving theo tháng"></svg></div>
       </div>
     </div>
@@ -446,7 +448,7 @@
         <div class="panel-head"><h3 class="panel-title">Khối lượng theo BPYC (trong năm)</h3></div>
         <div class="table-wrap" style="border:none;box-shadow:none;">
           <table class="tbl-compact"><thead><tr>
-            <th class="no-sort">BPYC</th><th class="no-sort">Task</th><th class="no-sort">Ngân sách</th>
+            <th class="no-sort">BPYC</th><th class="no-sort">Task</th><th class="no-sort">Ngân sách (đủ giá)</th>
             <th class="no-sort">Saving</th><th class="no-sort">Tỷ lệ saving</th>
           </tr></thead><tbody id="bpycBody"></tbody></table>
         </div>
@@ -673,7 +675,12 @@
     if(!n) return "0";
     return (Number(n)/1000000).toLocaleString("vi-VN",{maximumFractionDigits:1});
   }
-  function pct(n){ return (isFinite(n)? (Math.round(n*10)/10) : 0) + "%"; }
+  function pct(n){ return (isFinite(n)? (Math.round(n*10)/10) : 0).toLocaleString("vi-VN") + "%"; }
+  function fmtBig(n){ /* triệu -> "x,y tỷ" khi ≥ 1.000 triệu */
+    var v=Number(n)||0;
+    return Math.abs(v)>=1e9 ? (v/1e9).toLocaleString("vi-VN",{maximumFractionDigits:2})+" tỷ"
+                            : (v/1e6).toLocaleString("vi-VN",{maximumFractionDigits:1})+" tr";
+  }
   function initials(name){
     if(!name) return "?";
     var parts = String(name).trim().split(/\s+/);
@@ -763,11 +770,15 @@
     var d = t.pr_date || t.due_date || "";
     return d ? d.slice(0,7) : "";
   }
+  /* Chỉ chấm đúng hạn khi hạn giao có trước lúc hoàn thành.
+     Task không có Ngày PR mà hạn giao = ngày hoàn thành là nhập bù sau, không đo được. */
   function isOnTime(t){
     if(t.status!=="Hoàn thành") return null;
     if(!t.due_date || !t.complete_date) return null;
+    if(!t.pr_date && t.due_date===t.complete_date) return null;
     return t.complete_date <= t.due_date;
   }
+  function hasBoth(t){ return savingOf(t)!==null; }
 
   /* ================= STORAGE LAYER ================= */
   function localLoad(){
@@ -879,7 +890,8 @@
       if(f.bpyc && t.bpyc!==f.bpyc) return false;
       if(f.pic && t.pic!==f.pic) return false;
       if(f.supplier && t.supplier!==f.supplier) return false;
-      if(f.status && t.status!==f.status) return false;
+      if(f.status==="__open"){ if(t.status==="Hoàn thành"||t.status==="Hủy") return false; }
+      else if(f.status && t.status!==f.status) return false;
       if(f.priority && urgencyOf(t).level!==f.priority) return false;
       if(f.month && monthKeyOf(t)!==f.month) return false;
       if(f.dueFrom && (!t.due_date || t.due_date<f.dueFrom)) return false;
@@ -912,27 +924,42 @@
   /* ================= RENDER: STATS ================= */
   function renderStats(){
     var active = state.tasks.filter(function(t){return t.status!=="Hủy";});
-    var urgent = active.filter(function(t){return urgencyOf(t).level==="urgent";}).length;
-    var soon = active.filter(function(t){return urgencyOf(t).level==="soon";}).length;
+    var open = active.filter(function(t){return t.status!=="Hoàn thành";});
+    var overdue = open.filter(function(t){return t.due_date && t.due_date<todayISO();}).length;
+    var flagged = open.filter(function(t){return t.urgent_override && !(t.due_date && t.due_date<todayISO());}).length;
+    var soon = open.filter(function(t){return urgencyOf(t).level==="soon";}).length;
+    var noDue = open.filter(function(t){return !t.due_date;}).length;
     var done = active.filter(function(t){return t.status==="Hoàn thành";}).length;
     var cancelled = state.tasks.filter(function(t){return t.status==="Hủy";}).length;
-    var totalBudget = active.reduce(function(s,t){return s+(Number(t.budget)||0);},0);
-    var totalSaving = active.reduce(function(s,t){var v=savingOf(t);return s+(v===null?0:v);},0);
-    var inProgress = active.filter(function(t){return t.status==="Đang xử lý";}).length;
-    var notStarted = active.filter(function(t){return t.status==="Chưa bắt đầu";}).length;
+    var paired = active.filter(hasBoth);
+    var totalBudget = paired.reduce(function(s,t){return s+Number(t.budget);},0);
+    var totalSaving = paired.reduce(function(s,t){return s+savingOf(t);},0);
+    var inProgress = open.filter(function(t){return t.status==="Đang xử lý";}).length;
+    var notStarted = open.filter(function(t){return t.status==="Chưa bắt đầu";}).length;
     var cards = [
       {l:"Tổng số task", v:state.tasks.length, s:done+" hoàn thành · "+cancelled+" hủy", d:"var(--blue)"},
-      {l:"Đang thực hiện", v:inProgress, s:notStarted+" chưa bắt đầu · "+(inProgress+notStarted)+" đang mở", d:"var(--navy-2)"},
-      {l:"Gấp / Quá hạn", v:urgent, s:"cần xử lý ngay", d:"var(--red)"},
-      {l:"Sắp đến hạn (≤"+state.config.soonDays+" ngày)", v:soon, s:"theo dõi sát", d:"var(--gold)"},
-      {l:"Ngân sách (trước VAT)", v:fmtMoney(totalBudget), s:"không tính task hủy", d:"var(--navy-2)", txt:true},
-      {l:"Tổng saving", v:fmtMoney(totalSaving), s:pct(totalBudget?totalSaving/totalBudget*100:0)+" ngân sách", d:"var(--green)", txt:true}
+      {l:"Đang mở", v:open.length, s:inProgress+" đang xử lý · "+notStarted+" chưa bắt đầu", d:"var(--navy-2)", f:{status:"__open",priority:""}},
+      {l:"Quá hạn", v:overdue, s:(flagged?flagged+" task gắn Gấp · ":"")+"cần xử lý ngay", d:"var(--red)", f:{priority:"urgent"}},
+      {l:"Sắp đến hạn (≤"+state.config.soonDays+" ngày)", v:soon, s:noDue?(noDue+" task đang mở chưa có hạn giao"):"theo dõi sát", d:"var(--gold)", f:{priority:"soon"}},
+      {l:"Ngân sách (trước VAT)", v:fmtBig(totalBudget), s:paired.length+"/"+active.length+" task có đủ ngân sách & giá duyệt", d:"var(--navy-2)", txt:true},
+      {l:"Tổng saving", v:fmtBig(totalSaving), s:pct(totalBudget?totalSaving/totalBudget*100:0)+" trên ngân sách tương ứng", d:"var(--green)", txt:true}
     ];
-    $("statsRow").innerHTML = cards.map(function(c){
-      return '<div class="stat"><div class="stat-label"><span class="stat-dot" style="background:'+c.d+'"></span>'+
-        esc(c.l)+'</div><div class="stat-value '+(c.txt?"num":"")+'"'+(c.txt?' style="font-size:17px;"':'')+'>'+
+    $("statsRow").innerHTML = cards.map(function(c,i){
+      return '<div class="stat'+(c.f?' stat-click':'')+'" data-i="'+i+'"'+(c.f?' role="button" tabindex="0"':'')+'><div class="stat-label"><span class="stat-dot" style="background:'+c.d+'"></span>'+
+        esc(c.l)+'</div><div class="stat-value '+(c.txt?"num":"")+'"'+(c.txt?' style="font-size:19px;"':'')+'>'+
         esc(String(c.v))+'</div><div class="stat-sub">'+esc(c.s)+'</div></div>';
     }).join("");
+    $("statsRow").querySelectorAll(".stat-click").forEach(function(el){
+      var go=function(){
+        var f=cards[Number(el.dataset.i)].f;
+        if("status" in f){ state.filters.status=f.status; $("fStatus").value=f.status; }
+        if("priority" in f){ state.filters.priority=f.priority; $("fPriority").value=f.priority; }
+        if(state.tab!=="board") switchTab("board");
+        renderTable();
+      };
+      el.onclick=go;
+      el.onkeydown=function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); go(); } };
+    });
   }
 
   /* ================= RENDER: FILTER OPTIONS ================= */
@@ -1026,17 +1053,21 @@
     var cancelled = tasks.filter(function(t){return t.status==="Hủy";}).length;
     var active = tasks.filter(function(t){return t.status!=="Hủy";});
     var done = active.filter(function(t){return t.status==="Hoàn thành";});
-    var budget = active.reduce(function(s,t){return s+(Number(t.budget)||0);},0);
-    var accept = active.reduce(function(s,t){return s+(Number(t.accept)||0);},0);
-    var savingTasks = active.filter(function(t){return savingOf(t)!==null;});
-    var saving = savingTasks.reduce(function(s,t){return s+savingOf(t);},0);
-    var savingBase = savingTasks.reduce(function(s,t){return s+(Number(t.budget)||0);},0);
+    /* Ngân sách, giá duyệt và saving đều tính trên CÙNG một tập: task có đủ cả hai giá trị */
+    var savingTasks = active.filter(hasBoth);
+    var budget = savingTasks.reduce(function(s,t){return s+(Number(t.budget)||0);},0);
+    var accept = savingTasks.reduce(function(s,t){return s+(Number(t.accept)||0);},0);
+    var saving = budget - accept;
+    var savingBase = budget;
+    var small = savingTasks.filter(function(t){ return Number(t.budget)<1e9; });
+    var smallBase = small.reduce(function(s,t){return s+Number(t.budget);},0);
+    var smallSaving = small.reduce(function(s,t){return s+savingOf(t);},0);
 
     var judged = done.map(isOnTime).filter(function(v){return v!==null;});
     var onTime = judged.filter(Boolean).length;
     var leads = done.map(function(t){return daysBetween(t.pr_date,t.complete_date);})
-                    .filter(function(v){return v!==null && v>=0;});
-    var avgLead = leads.length ? leads.reduce(function(a,b){return a+b;},0)/leads.length : null;
+                    .filter(function(v){return v!==null && v>=0;}).sort(function(a,b){return a-b;});
+    var avgLead = leads.length ? leads[Math.floor(leads.length/2)] : null;   /* trung vị */
     var overdue = active.filter(function(t){return urgencyOf(t).level==="urgent";}).length;
     var today2 = todayISO();
     var lateDone = done.filter(function(t){ return isOnTime(t)===false; }).length;
@@ -1047,8 +1078,10 @@
     return {
       total: total, cancelled: cancelled, activeCount: active.length,
       doneCount: done.length, budget: budget, accept: accept,
-      saving: saving, savingBase: savingBase,
+      saving: saving, savingBase: savingBase, pairedCount: savingTasks.length,
       savingRate: savingBase ? saving/savingBase*100 : 0,
+      bigCount: savingTasks.length-small.length,
+      smallRate: smallBase ? smallSaving/smallBase*100 : 0, leadCount: leads.length,
       completionRate: active.length ? done.length/active.length*100 : 0,
       cancelRate: total ? cancelled/total*100 : 0,
       onTimeRate: judged.length ? onTime/judged.length*100 : null,
@@ -1098,8 +1131,11 @@
     var text = "";
     if(good.length) text += "Điểm mạnh: "+good.join(", ")+". ";
     if(bad.length) text += "Cần cải thiện: "+bad.join(", ")+". ";
-    if(a.avgLead!==null) text += "Lead time trung bình từ PR đến hoàn thành là "+Math.round(a.avgLead)+" ngày. ";
-    if(a.judgedCount===0 && a.doneCount>0) text += "Lưu ý: chưa đủ dữ liệu ngày hạn/ngày hoàn thành để chấm đúng hạn. ";
+    if(a.avgLead!==null) text += "Lead time (trung vị) từ PR đến hoàn thành là "+Math.round(a.avgLead)+" ngày. ";
+    if(a.doneCount>0 && a.judgedCount < a.doneCount*0.6)
+      text += "Lưu ý: chỉ "+a.judgedCount+"/"+a.doneCount+" task hoàn thành đủ dữ liệu để chấm đúng hạn, kết quả chưa đại diện. ";
+    if(a.activeCount>0 && a.pairedCount < a.activeCount*0.6)
+      text += "Saving chỉ tính được trên "+a.pairedCount+"/"+a.activeCount+" task có đủ ngân sách và giá duyệt. ";
     return {headline:headline, text:text.trim()};
   }
 
@@ -1120,12 +1156,13 @@
       {l:"Task phát sinh", v:a.total, s:a.cancelled+" hủy · "+a.doneCount+" xong"},
       {l:"Tỷ lệ hoàn thành", v:pct(a.completionRate), s:"trên task còn hiệu lực", bar:a.completionRate, c:"var(--blue)"},
       {l:"Giao đúng hạn", v:a.onTimeRate===null?"—":pct(a.onTimeRate),
-       s:a.judgedCount?("trên "+a.judgedCount+" task đo được"):"chưa đủ dữ liệu",
+       s:a.judgedCount?("đo được "+a.judgedCount+"/"+a.doneCount+" task xong"):"chưa đủ dữ liệu",
        bar:a.onTimeRate===null?0:a.onTimeRate, c:"var(--green)"},
-      {l:"Ngân sách (trước VAT)", v:fmtM(a.budget)+" tr", s:"giá duyệt "+fmtM(a.accept)+" tr"},
-      {l:"Saving", v:fmtM(a.saving)+" tr", s:pct(a.savingRate)+" · mục tiêu "+target+"%",
+      {l:"Ngân sách (trước VAT)", v:fmtBig(a.budget), s:"duyệt "+fmtBig(a.accept)+" · "+a.pairedCount+"/"+a.activeCount+" task đủ giá"},
+      {l:"Saving", v:fmtBig(a.saving), s:pct(a.savingRate)+" · mục tiêu "+target+"%"+
+        (a.bigCount?(" · bỏ "+a.bigCount+" HĐ ≥1 tỷ: "+pct(a.smallRate)):""),
        bar:Math.min(100,(a.savingRate/target)*100), c:"var(--gold)"},
-      {l:"Lead time TB", v:a.avgLead===null?"—":(Math.round(a.avgLead)+" ngày"), s:"PR → hoàn thành"},
+      {l:"Lead time", v:a.avgLead===null?"—":(Math.round(a.avgLead)+" ngày"), s:"trung vị PR → xong · "+a.leadCount+" task"},
       {l:"Tỷ lệ hủy", v:pct(a.cancelRate), s:a.cancelled+" task bị hủy"}
     ];
     $(kpiId).innerHTML = kpis.map(function(k){
@@ -1277,7 +1314,7 @@
 
     var yr = wantYear;
     var yearTasks = state.tasks.filter(function(t){ return monthKeyOf(t).slice(0,4)===yr; });
-    $("yearHint").textContent = "Tổng hợp toàn bộ task có Ngày PR trong năm "+yr+" · "+yearTasks.length+" task";
+    $("yearHint").textContent = "Toàn bộ task trong năm "+yr+" (theo Ngày PR, thiếu thì theo Hạn giao) · "+yearTasks.length+" task";
     $("chartYearHint").textContent = "Năm "+yr;
     renderVerdictBlock("yearVerdict","yearKpis", aggregate(yearTasks), "năm "+yr);
 
@@ -1330,7 +1367,7 @@
     drawGroupedBars("chartMoney", labels, [
       {name:"Ngân sách", values:mBudget, color:"#9BB0E4"},
       {name:"Saving", values:mSaving, color:"#EFB183"}
-    ], function(v){ return v>=1000 ? (v/1000).toFixed(1)+"B" : Math.round(v)+""; });
+    ], function(v){ return v>=1000 ? (v/1000).toLocaleString("vi-VN",{maximumFractionDigits:1})+" tỷ" : Math.round(v).toLocaleString("vi-VN"); });
 
     // PIC table
     var picMap = {};
@@ -1348,7 +1385,7 @@
         '<td class="num">'+(a.cancelled?'<span class="badge badge-grey">'+a.cancelled+'</span>':'0')+'</td>'+
         '<td class="num">'+(a.lateTotal?'<span class="badge badge-red">'+a.lateTotal+'</span>':'0')+
           (a.stillLate?'<div class="item-note">'+a.stillLate+' đang quá hạn</div>':'')+'</td>'+
-        '<td class="num '+(a.saving>=0?"saving-pos":"saving-neg")+'">'+fmtM(a.saving)+' tr</td></tr>';
+        '<td class="num '+(a.saving>=0?"saving-pos":"saving-neg")+'">'+fmtBig(a.saving)+'</td></tr>';
     });
     $("picBody").innerHTML = picRows.length?picRows.join(""):'<tr><td colspan="7" style="color:var(--ink-faint);">Chưa có dữ liệu</td></tr>';
 
@@ -1363,8 +1400,8 @@
       var a = aggregate(bMap[k]);
       return '<tr><td><span class="chip '+chipClassFor(k)+'">'+esc(k)+'</span></td>'+
         '<td class="num">'+a.total+'</td>'+
-        '<td class="num">'+fmtM(a.budget)+' tr</td>'+
-        '<td class="num '+(a.saving>=0?"saving-pos":"saving-neg")+'">'+fmtM(a.saving)+' tr</td>'+
+        '<td class="num">'+fmtBig(a.budget)+'</td>'+
+        '<td class="num '+(a.saving>=0?"saving-pos":"saving-neg")+'">'+fmtBig(a.saving)+'</td>'+
         '<td class="num">'+pct(a.savingRate)+'</td></tr>';
     });
     $("bpycBody").innerHTML = bRows.length?bRows.join(""):'<tr><td colspan="5" style="color:var(--ink-faint);">Chưa có dữ liệu</td></tr>';
