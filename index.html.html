@@ -71,6 +71,13 @@
   .topbar-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;}
   .who{font-size:12.5px;color:#D7D0E8;display:flex;align-items:center;gap:7px;}
   .who b{color:#fff;font-weight:600;}
+  .dq-tag{display:inline-block;margin-top:4px;font-size:11px;font-weight:600;color:var(--gold-ink);background:var(--gold-soft);border-radius:4px;padding:1px 6px;cursor:help;}
+  .dq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;}
+  .dq-item{text-align:left;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;cursor:pointer;font-family:inherit;color:var(--ink);}
+  .dq-item:hover{border-color:var(--navy-2);}
+  .dq-item .n{font-size:20px;font-weight:600;font-family:'IBM Plex Mono',monospace;}
+  .dq-item.bad .n{color:var(--red-ink);} .dq-item.warn .n{color:var(--gold-ink);}
+  .dq-item .t{font-size:13px;font-weight:600;margin-top:2px;} .dq-item .p{font-size:12px;color:var(--ink-faint);margin-top:2px;}
   .stat-click{cursor:pointer;transition:border-color .12s ease;}
   .stat-click:hover,.stat-click:focus-visible{border-color:var(--navy-2);outline:none;}
   .who-box{display:flex;align-items:center;gap:9px;padding-left:12px;margin-left:4px;border-left:1px solid rgba(255,255,255,.18);}
@@ -365,6 +372,9 @@
       <div class="field" style="min-width:168px;"><label>Đến</label><div class="date-combo">
         <input type="text" id="fDueToTxt" placeholder="dd/mm/yyyy" inputmode="numeric" autocomplete="off">
         <input type="date" id="fDueTo" aria-label="Đến ngày"></div></div>
+      <div class="field"><label>Dữ liệu</label><select id="fDq">
+        <option value="">Tất cả</option><option value="any">Có lỗi / thiếu dữ liệu</option>
+      </select></div>
       <label class="chk-field"><input type="checkbox" id="fMine"> Task của tôi</label>
       <button class="btn btn-line" id="btnClear">Xoá bộ lọc</button>
     </div>
@@ -431,6 +441,12 @@
         <div class="panel-hint" id="yearHint"></div></div></div>
       <div class="verdict" id="yearVerdict"></div>
       <div class="kpi-row" id="yearKpis"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><div><h3 class="panel-title">Kiểm tra dữ liệu</h3>
+        <div class="panel-hint">Các lỗi này làm sai số liệu bên trên. Bấm vào một nhóm để mở danh sách task cần sửa.</div></div></div>
+      <div class="dq-grid" id="dqGrid"></div>
     </div>
 
     <div class="grid-2">
@@ -510,7 +526,7 @@
         <option>F&amp;B</option><option>IT</option><option>Technical</option><option>OPS</option>
         <option>HR</option><option>Legal</option><option>Finance</option>
       </select></div>
-      <div class="field"><label>Người yêu cầu</label><input type="text" id="mRequester" placeholder="Phòng ban / cá nhân"></div>
+      <div class="field"><label>Người yêu cầu</label><input type="text" id="mRequester" placeholder="Họ tên người đề nghị"></div>
       <div class="field"><label>PIC phụ trách</label>
         <input type="text" id="mPic" list="picOptions" placeholder="Tên nhân sự SCM">
         <datalist id="picOptions"></datalist></div>
@@ -522,19 +538,19 @@
       <div class="field"><label>Ngày PR</label><div class="date-combo">
         <input type="text" id="mPrDateTxt" placeholder="dd/mm/yyyy" inputmode="numeric" autocomplete="off">
         <input type="date" id="mPrDate" aria-label="Chọn ngày PR"></div></div>
-      <div class="field"><label>Ngày yêu cầu giao hàng</label><div class="date-combo">
+      <div class="field"><label>Hạn giao hàng *</label><div class="date-combo">
         <input type="text" id="mDueDateTxt" placeholder="dd/mm/yyyy" inputmode="numeric" autocomplete="off">
         <input type="date" id="mDueDate" aria-label="Chọn ngày giao hàng"></div></div>
       <div class="field"><label>Trạng thái</label><select id="mStatus">
         <option>Chưa bắt đầu</option><option>Đang xử lý</option><option>Hoàn thành</option><option>Hủy</option>
       </select></div>
-      <div class="field"><label>Ngày hoàn thành</label><div class="date-combo">
+      <div class="field" id="completeWrap"><label>Ngày hoàn thành</label><div class="date-combo">
         <input type="text" id="mCompleteDateTxt" placeholder="dd/mm/yyyy" inputmode="numeric" autocomplete="off">
         <input type="date" id="mCompleteDate" aria-label="Chọn ngày hoàn thành"></div></div>
-      <div class="field full" id="cancelReasonWrap" hidden><label>Lý do hủy</label>
+      <div class="field full" id="cancelReasonWrap" hidden><label>Lý do hủy *</label>
         <input type="text" id="mCancelReason" placeholder="VD: BPYC rút yêu cầu, vượt ngân sách…"></div>
       <label class="chk-field full"><input type="checkbox" id="mUrgentOverride"> Đánh dấu là task GẤP (bất kể hạn giao)</label>
-      <div class="field full"><label>Ghi chú</label><textarea id="mNote" placeholder="Ghi chú thêm…"></textarea></div>
+      <div class="field full"><label>Ghi chú</label><textarea id="mNote" placeholder="Tiến độ, ghi chú… (không ghi vào tên hạng mục)"></textarea></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-line" id="mCancel">Huỷ</button>
@@ -634,7 +650,7 @@
     tab: "board",
     editingId: null,
     editingMemberId: null,
-    filters: { search:"", bpyc:"", pic:"", supplier:"", status:"", priority:"", month:"", dueFrom:"", dueTo:"", mine:false },
+    filters: { search:"", bpyc:"", pic:"", supplier:"", status:"", priority:"", month:"", dueFrom:"", dueTo:"", mine:false, dq:"" },
     sort: { key:"due_date", dir:"asc" }
   };
   var db = null;
@@ -780,6 +796,35 @@
   }
   function hasBoth(t){ return savingOf(t)!==null; }
 
+  /* ---- Kiểm tra chất lượng dữ liệu ---- */
+  function normName(x){ return String(x||"").trim().toLowerCase().replace(/\s+/g," "); }
+  function dupNameCount(){
+    var c={};
+    state.tasks.forEach(function(t){ if(t.status!=="Hủy"){ var k=normName(t.item); c[k]=(c[k]||0)+1; } });
+    return c;
+  }
+  var DQ_CHECKS = [
+    {k:"future", sev:"bad", l:"Ngày hoàn thành ở tương lai", p:"Thường do gõ nhầm tháng.",
+     f:function(t){ return t.complete_date && t.complete_date>todayISO(); }},
+    {k:"openDone", sev:"bad", l:"Chưa xong nhưng đã có ngày hoàn thành", p:"Trạng thái và ngày hoàn thành mâu thuẫn.",
+     f:function(t){ return (t.status==="Chưa bắt đầu"||t.status==="Đang xử lý") && t.complete_date; }},
+    {k:"dup", sev:"bad", l:"Trùng tên với task khác", p:"Có thể bị tạo hai lần.",
+     f:function(t,c){ return t.status!=="Hủy" && c[normName(t.item)]>1; }},
+    {k:"dueBeforePr", sev:"bad", l:"Hạn giao trước Ngày PR", p:"Kiểm tra lại hai ngày này.",
+     f:function(t){ return t.pr_date && t.due_date && t.due_date<t.pr_date; }},
+    {k:"noPr", sev:"warn", l:"Thiếu Ngày PR", p:"Không tính được lead time, dễ bị xếp sai tháng.",
+     f:function(t){ return t.status!=="Hủy" && !t.pr_date; }},
+    {k:"noDue", sev:"warn", l:"Đang mở nhưng chưa có hạn giao", p:"Sẽ không bao giờ báo quá hạn.",
+     f:function(t){ return (t.status==="Chưa bắt đầu"||t.status==="Đang xử lý") && !t.due_date; }},
+    {k:"doneNoPrice", sev:"warn", l:"Hoàn thành nhưng thiếu ngân sách hoặc giá duyệt", p:"Không tính được saving.",
+     f:function(t){ return t.status==="Hoàn thành" && !hasBoth(t); }},
+    {k:"doneNoSup", sev:"warn", l:"Hoàn thành nhưng chưa ghi NCC", p:"Thiếu dữ liệu đánh giá nhà cung cấp.",
+     f:function(t){ return t.status==="Hoàn thành" && !t.supplier; }},
+    {k:"noReq", sev:"warn", l:"Thiếu người yêu cầu", p:"Nên ghi họ tên người đề nghị.",
+     f:function(t){ return t.status!=="Hủy" && !t.requester; }}
+  ];
+  function dqOf(t, c){ c=c||dupNameCount(); return DQ_CHECKS.filter(function(d){ return d.f(t,c); }); }
+
   /* ================= STORAGE LAYER ================= */
   function localLoad(){
     try{
@@ -886,6 +931,7 @@
   function getFiltered(){
     var f = state.filters;
     var s = f.search.trim().toLowerCase();
+    var dupC = dupNameCount();
     var rows = state.tasks.filter(function(t){
       if(f.bpyc && t.bpyc!==f.bpyc) return false;
       if(f.pic && t.pic!==f.pic) return false;
@@ -897,6 +943,11 @@
       if(f.dueFrom && (!t.due_date || t.due_date<f.dueFrom)) return false;
       if(f.dueTo && (!t.due_date || t.due_date>f.dueTo)) return false;
       if(f.mine && state.me && t.pic!==state.me.name) return false;
+      if(f.dq){
+        var hit = f.dq==="any" ? dqOf(t,dupC).length>0
+                               : DQ_CHECKS.some(function(d){ return d.k===f.dq && d.f(t,dupC); });
+        if(!hit) return false;
+      }
       if(s){
         var hay=[t.item,t.supplier,t.requester,t.pic,t.note,t.bpyc,t.cancel_reason].join(" ").toLowerCase();
         if(hay.indexOf(s)===-1) return false;
@@ -980,6 +1031,10 @@
     fillSelect($("fPic"), pics, state.filters.pic);
     $("picOptions").innerHTML = pics.map(function(p){return '<option value="'+esc(p)+'">';}).join("");
 
+    if($("fDq").options.length<=2){
+      DQ_CHECKS.forEach(function(d){ var o=document.createElement("option"); o.value=d.k; o.textContent=d.l; $("fDq").appendChild(o); });
+    }
+    $("fDq").value = state.filters.dq||"";
     var sups = Array.from(new Set(state.tasks.map(function(t){return t.supplier;}).filter(Boolean))).sort();
     fillSelect($("fSupplier"), sups, state.filters.supplier);
     $("supplierOptions").innerHTML = sups.map(function(p){return '<option value="'+esc(p)+'">';}).join("");
@@ -988,6 +1043,7 @@
   /* ================= RENDER: TABLE ================= */
   function renderTable(){
     var rows = getFiltered();
+    var dupC = dupNameCount();
     var body = $("taskBody");
     $("emptyState").hidden = rows.length!==0;
     body.innerHTML = rows.map(function(t){
@@ -998,9 +1054,11 @@
         savingHtml = '<span class="num '+(sv>=0?"saving-pos":"saving-neg")+'">'+(sv>0?"+":"")+fmtMoney(sv)+'</span>';
       }
       var sub = t.status==="Hủy" && t.cancel_reason ? "Lý do hủy: "+t.cancel_reason : t.note;
+      var dq = dqOf(t, dupC);
       return '<tr class="'+u.row+'">'+
         '<td><div class="item-title">'+esc(t.item)+'</div>'+
-          (sub?'<div class="item-note">'+esc(sub)+'</div>':'')+'</td>'+
+          (sub?'<div class="item-note">'+esc(sub)+'</div>':'')+
+          (dq.length?'<span class="dq-tag" title="'+esc(dq.map(function(d){return d.l;}).join(" · "))+'">'+dq.length+' lỗi dữ liệu</span>':'')+'</td>'+
         '<td><span class="chip '+chipClassFor(t.bpyc)+'">'+(esc(t.bpyc)||"—")+'</span></td>'+
         '<td>'+(esc(t.requester)||"—")+'</td>'+
         '<td><span class="pic-pill"><span class="pic-avatar">'+esc(initials(t.pic))+'</span>'+(esc(t.pic)||"—")+'</span></td>'+
@@ -1405,6 +1463,23 @@
         '<td class="num">'+pct(a.savingRate)+'</td></tr>';
     });
     $("bpycBody").innerHTML = bRows.length?bRows.join(""):'<tr><td colspan="5" style="color:var(--ink-faint);">Chưa có dữ liệu</td></tr>';
+    renderDq();
+  }
+  function renderDq(){
+    var c = dupNameCount();
+    var items = DQ_CHECKS.map(function(d){
+      return {d:d, n:state.tasks.filter(function(t){ return d.f(t,c); }).length};
+    }).filter(function(x){ return x.n>0; });
+    $("dqGrid").innerHTML = items.length ? items.map(function(x){
+      return '<button class="dq-item '+x.d.sev+'" data-k="'+x.d.k+'"><div class="n">'+x.n+'</div>'+
+        '<div class="t">'+esc(x.d.l)+'</div><div class="p">'+esc(x.d.p)+'</div></button>';
+    }).join("") : '<div style="color:var(--green-ink);font-size:13px;">Không phát hiện lỗi dữ liệu.</div>';
+    $("dqGrid").querySelectorAll(".dq-item").forEach(function(b){
+      b.onclick=function(){
+        state.filters.dq=b.dataset.k; $("fDq").value=b.dataset.k;
+        switchTab("board"); renderTable();
+      };
+    });
   }
   /* ================= RENDER: ADMIN ================= */
   function renderAdmin(){
@@ -1467,7 +1542,9 @@
     el.className="num "+(sv>=0?"saving-pos":"saving-neg");
   }
   function syncCancelField(){
-    $("cancelReasonWrap").hidden = $("mStatus").value!=="Hủy";
+    var st=$("mStatus").value;
+    $("cancelReasonWrap").hidden = st!=="Hủy";
+    $("completeWrap").hidden = !(st==="Hoàn thành"||st==="Hủy");
   }
   function openModal(id, dupSource){
     state.editingId = id||null;
@@ -1495,11 +1572,23 @@
 
   function saveFromModal(){
     var item=$("mItem").value.trim();
-    if(!item){ showToast("Vui lòng nhập tên hạng mục"); return; }
+    if(!item){ showToast("Nhập tên hạng mục để lưu task."); $("mItem").focus(); return; }
     var status=$("mStatus").value;
     var complete=$("mCompleteDate").value;
-    if(status==="Hoàn thành" && !complete) complete=todayISO();
-    if(status!=="Hoàn thành") complete = status==="Hủy" ? complete : complete;
+    var pr=$("mPrDate").value, due=$("mDueDate").value, today=todayISO();
+    if(status==="Hoàn thành" && !complete) complete=today;
+    if(status==="Chưa bắt đầu"||status==="Đang xử lý") complete="";   /* chưa xong thì không có ngày hoàn thành */
+    if(complete && complete>today){ showToast("Ngày hoàn thành không được sau hôm nay ("+fmtDate(today)+")."); return; }
+    if(pr && due && due<pr){ showToast("Hạn giao không được trước Ngày PR."); return; }
+    if(pr && complete && complete<pr){ showToast("Ngày hoàn thành không được trước Ngày PR."); return; }
+    if((status==="Chưa bắt đầu"||status==="Đang xử lý") && !due){ showToast("Nhập hạn giao hàng cho task đang mở để hệ thống nhắc khi gần hạn."); return; }
+    if(status==="Hủy" && !$("mCancelReason").value.trim()){ showToast("Ghi lý do hủy để báo cáo về sau."); return; }
+    var bRaw=$("mBudget").value, aRaw=$("mAccept").value;
+    if((bRaw!==""&&Number(bRaw)<0)||(aRaw!==""&&Number(aRaw)<0)){ showToast("Số tiền không được âm."); return; }
+    var dupe = state.tasks.find(function(x){
+      return x.id!==state.editingId && x.status!=="Hủy" && normName(x.item)===normName(item);
+    });
+    if(dupe && !confirm('Đã có task cùng tên "'+dupe.item+'" ('+dupe.status+'). Vẫn lưu task này?')) return;
     var existing = state.editingId ? state.tasks.find(function(x){return x.id===state.editingId;}) : null;
     var task = {
       id: existing ? existing.id : uid(),
@@ -1823,7 +1912,7 @@
     };
 
     var fmap = {fSearch:"search", fBpyc:"bpyc", fPic:"pic", fSupplier:"supplier",
-                fStatus:"status", fPriority:"priority", fMonth:"month"};
+                fStatus:"status", fPriority:"priority", fMonth:"month", fDq:"dq"};
     Object.keys(fmap).forEach(function(id){
       var ev = id==="fSearch" ? "input" : "change";
       $(id).addEventListener(ev,function(e){ state.filters[fmap[id]]=e.target.value; renderTable(); });
@@ -1832,7 +1921,7 @@
       state.filters.mine=e.target.checked; renderTable();
     });
     $("btnClear").onclick=function(){
-      state.filters={search:"",bpyc:"",pic:"",supplier:"",status:"",priority:"",month:"",dueFrom:"",dueTo:"",mine:false};
+      state.filters={search:"",bpyc:"",pic:"",supplier:"",status:"",priority:"",month:"",dueFrom:"",dueTo:"",mine:false,dq:""};
       Object.keys(fmap).forEach(function(id){ $(id).value=""; });
       $("fDueFrom").value=""; $("fDueTo").value="";
       $("fDueFromTxt").value=""; $("fDueToTxt").value="";
