@@ -16,42 +16,42 @@
 <style>
   [hidden]{ display:none !important; }
   :root{
-    --bg:#F6F4FA; --panel:#FFFFFF; --panel-2:#FAF8FD;
-    --ink:#3F3B56; --ink-soft:#6E6A87; --ink-faint:#A5A1BC;
-    --navy:#6E6490; --navy-2:#8479A8;
-    --gold:#EFB183; --gold-soft:#FDF1E6; --gold-ink:#A2663B;
+    --bg:#F3F6FA; --panel:#FFFFFF; --panel-2:#F7F9FC;
+    --ink:#1C2B45; --ink-soft:#56637A; --ink-faint:#8E9AAE;
+    --navy:#034EA2; --navy-2:#2F6DBF;
+    --gold:#F58020; --gold-soft:#FEF0E2; --gold-ink:#B0560A;
     --red:#E09191; --red-soft:#FCEDED; --red-ink:#AF5151;
     --green:#8BC7A8; --green-soft:#E8F6EF; --green-ink:#3F8964;
-    --blue:#9BB0E4; --blue-soft:#ECF1FD; --blue-ink:#4D66AE;
-    --slate:#AFABC4; --slate-soft:#F1EFF7; --slate-ink:#6E6A87;
-    --border:#E8E4F2; --border-soft:#F0EDF7;
+    --blue:#6F9BD8; --blue-soft:#E8F0FB; --blue-ink:#034EA2;
+    --slate:#A3AEC0; --slate-soft:#EDF1F6; --slate-ink:#56637A;
+    --border:#E1E7EF; --border-soft:#ECF0F5;
     --radius:12px;
-    --shadow:0 1px 2px rgba(80,70,120,.04), 0 8px 24px rgba(80,70,120,.07);
+    --shadow:0 1px 2px rgba(3,40,90,.04), 0 8px 24px rgba(3,40,90,.07);
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --bg:#16141F; --panel:#211E2D; --panel-2:#292538;
-      --ink:#EFECF6; --ink-soft:#B4AECB; --ink-faint:#837D9C;
-      --navy:#332D46; --navy-2:#463E60;
-      --gold:#EFB183; --gold-soft:#3D2C1F; --gold-ink:#F3C9A5;
+      --bg:#0E1420; --panel:#162033; --panel-2:#1C283E;
+      --ink:#E8EEF7; --ink-soft:#A9B5C9; --ink-faint:#77849B;
+      --navy:#0A3570; --navy-2:#1F4F8F;
+      --gold:#F58020; --gold-soft:#3A2410; --gold-ink:#FFB877;
       --red:#E09191; --red-soft:#3C2429; --red-ink:#F0B4B4;
       --green:#8BC7A8; --green-soft:#1E352C; --green-ink:#A9DCC3;
-      --blue:#9BB0E4; --blue-soft:#232948; --blue-ink:#BCCBF0;
-      --slate:#AFABC4; --slate-soft:#2C2839; --slate-ink:#C3BFD6;
-      --border:#352F47; --border-soft:#2C2739;
+      --blue:#6F9BD8; --blue-soft:#14284A; --blue-ink:#A9C6F2;
+      --slate:#A3AEC0; --slate-soft:#212C40; --slate-ink:#B8C2D3;
+      --border:#283550; --border-soft:#202B41;
       --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
     }
   }
   :root[data-theme="dark"]{
-    --bg:#16141F; --panel:#211E2D; --panel-2:#292538;
-    --ink:#EFECF6; --ink-soft:#B4AECB; --ink-faint:#837D9C;
-    --navy:#332D46; --navy-2:#463E60;
-    --gold:#EFB183; --gold-soft:#3D2C1F; --gold-ink:#F3C9A5;
+    --bg:#0E1420; --panel:#162033; --panel-2:#1C283E;
+    --ink:#E8EEF7; --ink-soft:#A9B5C9; --ink-faint:#77849B;
+    --navy:#0A3570; --navy-2:#1F4F8F;
+    --gold:#F58020; --gold-soft:#3A2410; --gold-ink:#FFB877;
     --red:#E09191; --red-soft:#3C2429; --red-ink:#F0B4B4;
     --green:#8BC7A8; --green-soft:#1E352C; --green-ink:#A9DCC3;
-    --blue:#9BB0E4; --blue-soft:#232948; --blue-ink:#BCCBF0;
-    --slate:#AFABC4; --slate-soft:#2C2839; --slate-ink:#C3BFD6;
-    --border:#352F47; --border-soft:#2C2739;
+    --blue:#6F9BD8; --blue-soft:#14284A; --blue-ink:#A9C6F2;
+    --slate:#A3AEC0; --slate-soft:#212C40; --slate-ink:#B8C2D3;
+    --border:#283550; --border-soft:#202B41;
     --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.25);
   }
   *{box-sizing:border-box;}
@@ -63,13 +63,13 @@
   .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
     background:var(--navy);color:#fff;border-radius:14px;padding:16px 22px;margin-bottom:16px;}
   .brand{display:flex;align-items:center;gap:12px;}
-  .brand-mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(140deg,#F7CBA6,#EFB183);
-    display:flex;align-items:center;justify-content:center;font-size:17px;color:#5A4630;font-weight:700;
+  .brand-mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(140deg,#FFA65C,#F58020);
+    display:flex;align-items:center;justify-content:center;font-size:17px;color:#fff;font-weight:700;
     font-family:'Space Grotesk',sans-serif;flex:none;}
   .brand-name{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:19px;letter-spacing:.2px;}
-  .brand-sub{font-size:12.5px;color:#D7D0E8;margin-top:1px;}
+  .brand-sub{font-size:12.5px;color:#C9DBF3;margin-top:1px;}
   .topbar-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;}
-  .who{font-size:12.5px;color:#D7D0E8;display:flex;align-items:center;gap:7px;}
+  .who{font-size:12.5px;color:#C9DBF3;display:flex;align-items:center;gap:7px;}
   .who b{color:#fff;font-weight:600;}
   .dq-tag{display:inline-block;margin-top:4px;font-size:11px;font-weight:600;color:var(--gold-ink);background:var(--gold-soft);border-radius:4px;padding:1px 6px;cursor:help;}
   .dq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;}
@@ -82,8 +82,8 @@
   .stat-click:hover,.stat-click:focus-visible{border-color:var(--navy-2);outline:none;}
   .who-box{display:flex;align-items:center;gap:9px;padding-left:12px;margin-left:4px;border-left:1px solid rgba(255,255,255,.18);}
   .btn:disabled{opacity:.45;cursor:not-allowed;}
-    .role-tag{background:rgba(247,203,166,.25);color:#F7CBA6;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:600;}
-  .role-tag.member{background:rgba(255,255,255,.14);color:#E3DEF0;}
+    .role-tag{background:rgba(245,128,32,.28);color:#FFC48F;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:600;}
+  .role-tag.member{background:rgba(255,255,255,.14);color:#DCE8F8;}
 
   .btn{border:1px solid transparent;border-radius:8px;padding:9px 15px;font-size:13.5px;font-weight:500;
     cursor:pointer;font-family:inherit;transition:transform .08s ease,background .15s ease,opacity .15s;
@@ -92,8 +92,8 @@
   .btn:disabled{opacity:.45;cursor:not-allowed;}
   .btn-ghost{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.18);}
   .btn-ghost:hover:not(:disabled){background:rgba(255,255,255,.16);}
-    .btn-gold{background:var(--gold);color:#54371F;font-weight:600;}
-  .btn-gold:hover:not(:disabled){background:#F7C39B;}
+    .btn-gold{background:var(--gold);color:#2B1400;font-weight:600;}
+  .btn-gold:hover:not(:disabled){background:#FF9440;}
   .btn-line{background:var(--panel);border-color:var(--border);color:var(--ink);}
   .btn-line:hover:not(:disabled){border-color:var(--ink-faint);}
   .btn-sm{padding:6px 11px;font-size:12.5px;}
@@ -1116,7 +1116,7 @@
     $("btnExport").disabled = state.dbReady && !state.me;
     document.querySelector('.tab[data-tab="admin"]').hidden = state.dbReady && !state.isAdmin;
     if(!state.me){
-      el.innerHTML = state.dbReady ? '<span style="color:#B7BDD6;">Chưa đăng nhập</span>' : '<span style="color:#B7BDD6;">Ngoại tuyến</span>';
+      el.innerHTML = state.dbReady ? '<span style="color:#A9C3E8;">Chưa đăng nhập</span>' : '<span style="color:#A9C3E8;">Ngoại tuyến</span>';
       return;
     }
     var roleLabel = state.isAdmin ? "Admin" : (state.me.role==="viewer" ? "Chỉ xem" : "Thành viên");
@@ -1408,7 +1408,7 @@
       mSaving.push(ag.saving/1000000);
     }
     // cột = khối lượng theo PIC, đường = trạng thái task
-    var PIC_COLORS=["#9BB0E4","#8BC7A8","#EFB183","#C9A7E0","#8ED0D8","#E6A8BF","#B9CE8E","#AFABC4"];
+    var PIC_COLORS=["#6F9BD8","#8BC7A8","#F5A05A","#C9A7E0","#8ED0D8","#E6A8BF","#B9CE8E","#A3AEC0"];
     var picCount={};
     state.tasks.forEach(function(t){
       if(monthKeyOf(t).slice(0,4)!==yr) return;
@@ -1427,7 +1427,7 @@
         }) };
     });
     if(rest.length){
-      barSeries.push({ name:"Khác ("+rest.length+" PIC)", color:"#CFCBDE",
+      barSeries.push({ name:"Khác ("+rest.length+" PIC)", color:"#CBD3E0",
         values: labels.map(function(_,mi){
           var key=yr+"-"+String(mi+1).padStart(2,"0");
           return state.tasks.filter(function(t){
@@ -1436,13 +1436,13 @@
         }) });
     }
     drawComboChart("chartCount", labels, barSeries, [
-      {name:"Tổng phát sinh", values:cNew, color:"#6E6490"},
+      {name:"Tổng phát sinh", values:cNew, color:"#034EA2"},
       {name:"Hoàn thành", values:cDone, color:"#3F8964"},
       {name:"Hủy", values:cCancel, color:"#AF5151", dash:true}
     ]);
     drawGroupedBars("chartMoney", labels, [
-      {name:"Ngân sách", values:mBudget, color:"#9BB0E4"},
-      {name:"Saving", values:mSaving, color:"#EFB183"}
+      {name:"Ngân sách", values:mBudget, color:"#6F9BD8"},
+      {name:"Saving", values:mSaving, color:"#F58020"}
     ], function(v){ return v>=1000 ? (v/1000).toLocaleString("vi-VN",{maximumFractionDigits:1})+" tỷ" : Math.round(v).toLocaleString("vi-VN"); });
 
     // PIC table
