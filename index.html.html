@@ -535,10 +535,10 @@
       <div class="field"><label>Ngân sách (trước VAT)</label><input type="number" id="mBudget" placeholder="0" min="0"></div>
       <div class="field"><label>Giá trị duyệt (trước VAT)</label><input type="number" id="mAccept" placeholder="0" min="0"></div>
       <div class="saving-preview"><span>Saving tự động tính</span><span class="num" id="mSavingPreview">—</span></div>
-      <div class="field"><label>Ngày PR</label><div class="date-combo">
+      <div class="field"><label>Ngày PR *</label><div class="date-combo">
         <input type="text" id="mPrDateTxt" placeholder="dd/mm/yyyy" inputmode="numeric" autocomplete="off">
         <input type="date" id="mPrDate" aria-label="Chọn ngày PR"></div></div>
-      <div class="field"><label>Hạn giao hàng *</label><div class="date-combo">
+      <div class="field"><label>Ngày giao hàng</label><div class="date-combo">
         <input type="text" id="mDueDateTxt" placeholder="dd/mm/yyyy" inputmode="numeric" autocomplete="off">
         <input type="date" id="mDueDate" aria-label="Chọn ngày giao hàng"></div></div>
       <div class="field"><label>Trạng thái</label><select id="mStatus">
@@ -816,8 +816,6 @@
      f:function(t){ return t.pr_date && t.due_date && t.due_date<t.pr_date; }},
     {k:"noPr", sev:"warn", l:"Thiếu Ngày PR", p:"Không tính được lead time, dễ bị xếp sai tháng.",
      f:function(t){ return t.status!=="Hủy" && !t.pr_date; }},
-    {k:"noDue", sev:"warn", l:"Đang mở nhưng chưa có hạn giao", p:"Sẽ không bao giờ báo quá hạn.",
-     f:function(t){ return (t.status==="Chưa bắt đầu"||t.status==="Đang xử lý") && !t.due_date; }},
     {k:"doneNoPrice", sev:"warn", l:"Hoàn thành nhưng thiếu ngân sách hoặc giá duyệt", p:"Không tính được saving.",
      f:function(t){ return t.status==="Hoàn thành" && !hasBoth(t); }},
     {k:"doneNoSup", sev:"warn", l:"Hoàn thành nhưng chưa ghi NCC", p:"Thiếu dữ liệu đánh giá nhà cung cấp.",
@@ -993,7 +991,7 @@
       {l:"Tổng số task", v:state.tasks.length, s:done+" hoàn thành · "+cancelled+" hủy", d:"var(--blue)"},
       {l:"Đang mở", v:open.length, s:inProgress+" đang xử lý · "+notStarted+" chưa bắt đầu", d:"var(--navy-2)", f:{status:"__open",priority:""}},
       {l:"Quá hạn", v:overdue, s:(flagged?flagged+" task gắn Gấp · ":"")+"cần xử lý ngay", d:"var(--red)", f:{priority:"urgent"}},
-      {l:"Sắp đến hạn (≤"+state.config.soonDays+" ngày)", v:soon, s:noDue?(noDue+" task đang mở chưa có hạn giao"):"theo dõi sát", d:"var(--gold)", f:{priority:"soon"}},
+      {l:"Sắp đến hạn (≤"+state.config.soonDays+" ngày)", v:soon, s:"theo dõi sát", d:"var(--gold)", f:{priority:"soon"}},
       {l:"Ngân sách (trước VAT)", v:fmtBig(totalBudget), s:paired.length+"/"+active.length+" task có đủ ngân sách & giá duyệt", d:"var(--navy-2)", txt:true},
       {l:"Tổng saving", v:fmtBig(totalSaving), s:pct(totalBudget?totalSaving/totalBudget*100:0)+" trên ngân sách tương ứng", d:"var(--green)", txt:true}
     ];
@@ -1577,7 +1575,7 @@
     $("mSupplier").value = t?(t.supplier||""):"";
     $("mBudget").value = (t&&t.budget!==""&&t.budget!=null)?t.budget:"";
     $("mAccept").value = (t&&t.accept!==""&&t.accept!=null)?t.accept:"";
-    setDatePair("mPrDate", t?(t.pr_date||todayISO()):todayISO());
+    setDatePair("mPrDate", t?(t.pr_date||""):todayISO());
     setDatePair("mDueDate", t?(t.due_date||""):"");
     $("mStatus").value = t?t.status:"Chưa bắt đầu";
     setDatePair("mCompleteDate", t?(t.complete_date||""):"");
@@ -1601,7 +1599,7 @@
     if(complete && complete>today){ showToast("Ngày hoàn thành không được sau hôm nay ("+fmtDate(today)+")."); return; }
     if(pr && due && due<pr){ showToast("Hạn giao không được trước Ngày PR."); return; }
     if(pr && complete && complete<pr){ showToast("Ngày hoàn thành không được trước Ngày PR."); return; }
-    if((status==="Chưa bắt đầu"||status==="Đang xử lý") && !due){ showToast("Nhập hạn giao hàng cho task đang mở để hệ thống nhắc khi gần hạn."); return; }
+    if(!pr){ showToast("Nhập Ngày PR để lưu task."); return; }
     if(status==="Hủy" && !$("mCancelReason").value.trim()){ showToast("Ghi lý do hủy để báo cáo về sau."); return; }
     var bRaw=$("mBudget").value, aRaw=$("mAccept").value;
     if((bRaw!==""&&Number(bRaw)<0)||(aRaw!==""&&Number(aRaw)<0)){ showToast("Số tiền không được âm."); return; }
