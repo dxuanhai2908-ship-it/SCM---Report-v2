@@ -857,6 +857,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
       <button class="btn btn-gold" id="btnNew">+ Tạo task</button>
       <div class="who-box">
         <div class="who" id="whoAmI"><span>Đang kết nối…</span></div>
+        <button class="btn btn-ghost btn-sm" id="btnPw" hidden>Đổi mật khẩu</button>
         <button class="btn btn-ghost btn-sm" id="btnLogout" hidden>Đăng xuất</button>
       </div>
     </div>
@@ -1185,6 +1186,27 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     <div class="modal-foot">
       <button class="btn btn-line" id="mbCancel">Hủy</button>
       <button class="btn btn-gold" id="mbSave">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: ĐỔI MẬT KHẨU ============ -->
+<div class="modal-overlay" id="pwOverlay" hidden>
+  <div class="modal modal-sm" style="max-width:420px;">
+    <div class="modal-head">
+      <h3>Đổi mật khẩu</h3>
+      <button class="modal-close" id="pwClose" aria-label="Đóng">✕</button>
+    </div>
+    <div class="modal-body single">
+      <div style="font-size:12.5px;color:var(--ink-soft);line-height:1.55;" id="pwWho"></div>
+      <div class="field"><label>Mật khẩu hiện tại</label><input type="password" id="pwOld" autocomplete="current-password"></div>
+      <div class="field"><label>Mật khẩu mới</label><input type="password" id="pwNew" autocomplete="new-password" placeholder="Tối thiểu 8 ký tự"></div>
+      <div class="field"><label>Nhập lại mật khẩu mới</label><input type="password" id="pwNew2" autocomplete="new-password"></div>
+      <div id="pwError" style="font-size:12.5px;color:var(--red-ink);" hidden></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-line" id="pwCancel">Hủy</button>
+      <button class="btn btn-gold" id="pwSave">Đổi mật khẩu</button>
     </div>
   </div>
 </div>
@@ -1928,6 +1950,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
   function renderWho(){
     var el = $("whoAmI");
     $("btnLogout").hidden = !state.me;
+    if($("btnPw")) $("btnPw").hidden = !(state.me && auth && auth.currentUser);
     $("btnNew").disabled = !state.canEdit;
     $("btnExport").disabled = state.dbReady && !state.me;
     document.querySelector('.tab[data-tab="admin"]').hidden = state.dbReady && !state.isAdmin;
@@ -2756,8 +2779,8 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     var email=normEmail($("mbEmail").value);
     if(!email||!auth) return;
     auth.sendPasswordResetEmail(email)
-      .then(function(){ showToast("Đã gửi email đặt lại mật khẩu tới "+email); })
-      .catch(function(e){ showToast(authMsg(e)); });
+      .then(function(){ showToast("Đã gửi tới "+email+" (người gửi noreply@scm-project-ea359.firebaseapp.com). Nhờ người nhận kiểm tra cả Spam/Junk."); })
+      .catch(function(e){ showToast(e&&e.code==="auth/user-not-found" ? email+" chưa có tài khoản đăng nhập — đặt mật khẩu ban đầu rồi bấm Lưu để tạo." : authMsg(e)); });
   }
   function deleteMember(id){
     var m=state.members.find(function(x){return x.id===id;});
@@ -2812,9 +2835,47 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     var u=normEmail($("lgUser").value);
     if(!u){ loginError("Nhập email công ty vào ô Email, rồi bấm Quên mật khẩu."); return; }
     if(!auth){ loginError("Chưa kết nối được máy chủ xác thực."); return; }
-    var ok="Nếu "+u+" có tài khoản, email hướng dẫn đặt lại mật khẩu đã được gửi. Kiểm tra cả mục Spam.";
+    var ok="Đã gửi yêu cầu. Nếu "+u+" có tài khoản, email từ noreply@scm-project-ea359.firebaseapp.com sẽ tới trong vài phút — kiểm tra cả Spam/Junk/Quarantine. Không thấy sau 10 phút: liên hệ admin.";
+    $("lgForgot").disabled=true;
     auth.sendPasswordResetEmail(u).then(function(){ loginInfo(ok); })
-      .catch(function(e){ if(e&&e.code==="auth/invalid-email") loginError("Email không hợp lệ."); else loginInfo(ok); });
+      .catch(function(e){
+        var c=e&&e.code;
+        if(c==="auth/user-not-found") loginError("Email "+u+" chưa có tài khoản đăng nhập. Liên hệ admin để được tạo.");
+        else if(c==="auth/too-many-requests") loginError("Đã gửi quá nhiều lần. Đợi khoảng 1 giờ rồi thử lại.");
+        else loginError(c==="auth/invalid-email"?"Email không hợp lệ.":authMsg(e));
+      })
+      .then(function(){ setTimeout(function(){ $("lgForgot").disabled=false; },3000); });
+  }
+
+  /* ================= ĐỔI MẬT KHẨU (không cần email) ================= */
+  function openPw(){
+    if(!auth||!auth.currentUser) return;
+    $("pwWho").textContent="Tài khoản: "+auth.currentUser.email;
+    ["pwOld","pwNew","pwNew2"].forEach(function(i){ $(i).value=""; });
+    $("pwError").hidden=true; $("pwOverlay").hidden=false;
+    setTimeout(function(){ $("pwOld").focus(); },50);
+  }
+  function closePw(){ $("pwOverlay").hidden=true; }
+  function pwErr(m){ var e=$("pwError"); e.textContent=m; e.hidden=false; }
+  function savePw(){
+    var u=auth&&auth.currentUser, o=$("pwOld").value, n=$("pwNew").value, n2=$("pwNew2").value;
+    if(!u) return;
+    if(!o){ pwErr("Nhập mật khẩu hiện tại."); return; }
+    if(n.length<8){ pwErr("Mật khẩu mới tối thiểu 8 ký tự."); return; }
+    if(n!==n2){ pwErr("Hai lần nhập mật khẩu mới không khớp."); return; }
+    if(n===o){ pwErr("Mật khẩu mới phải khác mật khẩu hiện tại."); return; }
+    $("pwSave").disabled=true;
+    var cred=firebase.auth.EmailAuthProvider.credential(u.email,o);
+    u.reauthenticateWithCredential(cred)
+      .then(function(){ return u.updatePassword(n); })
+      .then(function(){ closePw(); showToast("Đã đổi mật khẩu. Lần sau đăng nhập bằng mật khẩu mới."); })
+      .catch(function(e){
+        var c=e&&e.code;
+        if(c==="auth/wrong-password"||c==="auth/invalid-credential"||c==="auth/invalid-login-credentials") pwErr("Mật khẩu hiện tại không đúng.");
+        else if(c==="auth/weak-password") pwErr("Mật khẩu mới quá yếu, chọn mật khẩu dài hơn.");
+        else pwErr(authMsg(e));
+      })
+      .then(function(){ $("pwSave").disabled=false; });
   }
   function doLogout(){ if(auth) auth.signOut(); else { state.me=null; renderAll(); } }
 
@@ -2960,6 +3021,9 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     $("memberOverlay").addEventListener("click",function(e){ if(e.target.id==="memberOverlay") closeMember(); });
 
     $("btnLogout").onclick=doLogout;
+    $("btnPw").onclick=openPw; $("pwClose").onclick=closePw; $("pwCancel").onclick=closePw; $("pwSave").onclick=savePw;
+    $("pwOverlay").addEventListener("click",function(e){ if(e.target.id==="pwOverlay") closePw(); });
+    $("pwNew2").addEventListener("keydown",function(e){ if(e.key==="Enter") savePw(); });
     $("lgSubmit").onclick=doLogin;
     $("lgForgot").onclick=doForgot;
     $("mbReset").onclick=sendResetFor;
