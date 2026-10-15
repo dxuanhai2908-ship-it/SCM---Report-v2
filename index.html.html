@@ -665,6 +665,22 @@ html[data-glass="on"] .chip, html[data-glass="on"] .badge{box-shadow:inset 0 1px
 .step-now.none{font-size:11.5px;color:var(--ink-faint);font-style:italic;}
 </style>
 
+
+<style>
+/* ===== Bước bổ sung ===== */
+.add-step-btn{border:1px dashed var(--navy-2);background:transparent;color:var(--navy);border-radius:999px;padding:4px 12px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;}
+.add-step-btn:hover{background:rgba(255,255,255,.5);}
+.tpl button.add-step-btn{border:1px dashed var(--navy-2);color:var(--navy);font-weight:700;background:rgba(255,255,255,.35);}
+.add-step-form{display:grid;grid-template-columns:1.6fr 1.3fr 90px auto auto;gap:8px;align-items:end;margin:6px 0 10px;padding:10px;border:1px dashed var(--border);border-radius:10px;background:rgba(255,255,255,.45);}
+.add-step-form label{display:block;font-size:11px;font-weight:600;color:var(--ink-soft);margin-bottom:3px;}
+.add-step-form input,.add-step-form select{width:100%;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px;background:var(--panel);color:var(--ink);}
+.add-step-form .btn{padding:7px 12px;}
+.add-step-form .err{grid-column:1 / -1;font-size:12px;color:var(--red-ink);}
+@media (max-width:640px){ .add-step-form{grid-template-columns:1fr 1fr;} }
+.xtag{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:700;color:#7A5A1A;background:#F6E7C8;border-radius:999px;padding:1px 7px;vertical-align:1px;}
+.step-row .delbtn{font:inherit;font-size:11.5px;border:0;background:transparent;color:var(--red-ink);cursor:pointer;text-decoration:underline;margin-left:6px;}
+.stepbar i.xstep{outline:1px solid rgba(201,162,74,.9);outline-offset:1px;}
+</style>
 <style>
 /* ===== Activity log ===== */
 .act-box{grid-column:1 / -1;}
@@ -1103,7 +1119,16 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
           <div class="tpl"><span style="font-size:12px;color:var(--ink-faint);align-self:center;">Mẫu:</span>
             <button type="button" data-tpl="full">Đầy đủ 8 bước</button>
             <button type="button" data-tpl="nocon">Không hợp đồng</button>
-            <button type="button" data-tpl="renew">Gia hạn HĐ</button></div></div>
+            <button type="button" data-tpl="renew">Gia hạn HĐ</button>
+            <button type="button" class="add-step-btn" id="btnAddStep">+ Thêm bước</button></div></div>
+        <div class="add-step-form" id="addStepForm" hidden>
+          <div><label for="asName">Tên bước</label><input id="asName" maxlength="40" placeholder="VD: Test mẫu, Khảo sát hiện trường"></div>
+          <div><label for="asAfter">Chèn sau bước</label><select id="asAfter"></select></div>
+          <div><label for="asSla">Hạn mức (ngày)</label><input id="asSla" type="number" min="1" max="60" value="3"></div>
+          <button type="button" class="btn btn-gold" id="asOk">Thêm</button>
+          <button type="button" class="btn btn-line" id="asCancel">Hủy</button>
+          <div class="err" id="asErr" hidden></div>
+        </div>
         <div id="stepRows"></div>
         <div class="steps-foot" id="stepFoot"></div>
       </div>
@@ -1401,9 +1426,19 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
   };
   function hasSteps(t){ return t.steps && Object.keys(t.steps).length>0; }
   /* Tính tiến độ: bước hiện tại, số ngày ở bước, tổng số ngày */
+
+  /* Bước chuẩn + bước bổ sung riêng của task (chèn sau bước được chọn) */
+  function stepsFor(t){
+    var extra=(t && t.custom_steps)||[];
+    if(!extra.length) return STEPS;
+    var out=[];
+    function pushAfter(k){ extra.filter(function(c){ return c.after===k; }).forEach(function(c){ var d={k:c.k,l:c.l,s:c.l,sla:Number(c.sla)||3,custom:true}; out.push(d); pushAfter(c.k); }); }
+    STEPS.forEach(function(d){ out.push(d); pushAfter(d.k); });
+    return out;
+  }
   function stepInfo(t){
     var st=t.steps||{}, prev=t.pr_date||null, list=[], cur=null, total=0;
-    STEPS.forEach(function(d){
+    stepsFor(t).forEach(function(d){
       var v=st[d.k]||{};
       if(v.skip){ list.push({d:d,state:"skip"}); return; }
       if(v.done){
@@ -1427,7 +1462,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     var I=stepInfo(t);
     var bar='<div class="stepbar" aria-hidden="true">'+I.list.map(function(x){
       var c = x.state==="done"?"done":x.state==="skip"?"skip":x.state==="cur"?(x.late?"late":"cur"):"";
-      return '<i class="'+c+'" title="'+esc(x.d.l)+(x.state==="skip"?" (bỏ qua)":"")+'"></i>';
+      return '<i class="'+c+(x.d.custom?' xstep':'')+'" title="'+esc(x.d.l)+(x.d.custom?" (bước bổ sung)":"")+(x.state==="skip"?" (bỏ qua)":"")+'"></i>';
     }).join("")+'</div>';
     var txt;
     if(t.status==="Hủy") txt='<span class="step-now none">Đã hủy ở bước '+I.doneN+'/'+I.activeN+'</span>';
@@ -1438,24 +1473,33 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
   }
 
   /* ---- trình sửa bước trong form ---- */
-  var editSteps = {};
+  var editSteps = {}, editCustom = [];
   function renderStepEditor(){
-    var fake = {steps:editSteps, pr_date:$("mPrDate").value};
+    var fake = {steps:editSteps, pr_date:$("mPrDate").value, custom_steps:editCustom};
     var I = stepInfo(fake);
     $("stepRows").innerHTML = I.list.map(function(x,i){
       var v = editSteps[x.d.k]||{};
       var dur = x.state==="done" ? x.days+" ngày" : x.state==="cur" && x.days!==null ? "đang "+x.days+" ngày" : "";
       return '<div class="step-row'+(x.state==="skip"?" is-skip":"")+(x.state==="cur"?" is-cur":"")+'">'+
         '<input type="checkbox" data-k="'+x.d.k+'" id="stp_'+x.d.k+'"'+(v.done?" checked":"")+' aria-label="Xong bước '+esc(x.d.l)+'">'+
-        '<label class="lbl" for="stp_'+x.d.k+'">'+(i+1)+'. '+esc(x.d.l)+'</label>'+
+        '<label class="lbl" for="stp_'+x.d.k+'">'+(i+1)+'. '+esc(x.d.l)+(x.d.custom?'<span class="xtag">bổ sung · '+x.d.sla+' ngày</span>':'')+'</label>'+
         '<input type="date" data-date="'+x.d.k+'" value="'+(v.done||"")+'" aria-label="Ngày xong '+esc(x.d.l)+'">'+
         '<span class="dur'+(x.late?" late":"")+'">'+dur+'</span>'+
-        '<button type="button" class="skipbtn" data-skip="'+x.d.k+'">'+(v.skip?"Dùng lại":"Bỏ qua")+'</button>'+
+        (x.d.custom ? '<button type="button" class="delbtn" data-del="'+x.d.k+'">Xóa bước</button>'
+                    : '<button type="button" class="skipbtn" data-skip="'+x.d.k+'">'+(v.skip?"Dùng lại":"Bỏ qua")+'</button>')+
       '</div>';
     }).join("");
     var f=$("stepFoot");
     if(I.finished) f.textContent="Đã xong "+I.activeN+"/"+I.activeN+" bước · tổng "+I.total+" ngày.";
     else f.textContent="Đang ở bước: "+I.cur.d.l+" · xong "+I.doneN+"/"+I.activeN+" bước. Tick vào bước vừa xong, ngày tự điền là hôm nay.";
+    $("stepRows").querySelectorAll("[data-del]").forEach(function(b){
+      b.onclick=function(){
+        var k=b.dataset.del, gone=editCustom.find(function(c){return c.k===k;});
+        /* bước con chèn sau bước bị xóa thì nối vào bước phía trước */
+        editCustom.forEach(function(c){ if(c.after===k) c.after=gone?gone.after:"pr"; });
+        editCustom=editCustom.filter(function(c){return c.k!==k;}); delete editSteps[k]; renderStepEditor();
+      };
+    });
     $("stepRows").querySelectorAll("input[type=checkbox]").forEach(function(cb){
       cb.onchange=function(){
         var k=cb.dataset.k; editSteps[k]=editSteps[k]||{};
@@ -1483,9 +1527,27 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     });
     renderStepEditor();
   }
+  function openAddStep(){
+    var list=stepsFor({custom_steps:editCustom}), sel=$("asAfter"), I=stepInfo({steps:editSteps,pr_date:$("mPrDate").value,custom_steps:editCustom});
+    sel.innerHTML=list.map(function(d){ return '<option value="'+d.k+'">'+esc(d.l)+'</option>'; }).join("");
+    /* mặc định: chèn ngay trước bước đang làm (sau bước vừa xong) */
+    var curIdx = I.cur ? list.findIndex(function(d){return d.k===I.cur.d.k;}) : list.length;
+    sel.value = list[Math.max(0, curIdx-1)].k;
+    $("asName").value=""; $("asSla").value="3"; $("asErr").hidden=true;
+    $("addStepForm").hidden=false; $("asName").focus();
+  }
+  function confirmAddStep(){
+    var name=$("asName").value.trim(), sla=Math.max(1,Math.min(60,Number($("asSla").value)||3)), after=$("asAfter").value;
+    var all=stepsFor({custom_steps:editCustom});
+    var e=$("asErr");
+    if(!name){ e.textContent="Nhập tên bước."; e.hidden=false; return; }
+    if(all.some(function(d){ return d.l.toLowerCase()===name.toLowerCase(); })){ e.textContent="Quy trình đã có bước tên này."; e.hidden=false; return; }
+    editCustom.push({k:"x"+Date.now().toString(36)+Math.random().toString(36).slice(2,5), l:name, sla:sla, after:after});
+    $("addStepForm").hidden=true; renderStepEditor();
+  }
   function readSteps(){
     var out={};
-    STEPS.forEach(function(d){ var v=editSteps[d.k]; if(v && (v.done||v.skip)) out[d.k]=v.skip?{skip:true}:{done:v.done}; });
+    stepsFor({custom_steps:editCustom}).forEach(function(d){ var v=editSteps[d.k]; if(v && (v.done||v.skip)) out[d.k]=v.skip?{skip:true}:{done:v.done}; });
     return out;
   }
 
@@ -1612,7 +1674,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
         if(!hasSteps(t) || t.status==="Hoàn thành" || t.status==="Hủy") return false;
         var si=stepInfo(t);
         if(!si.cur) return false;
-        if(f.step==="__late" ? !si.cur.late : si.cur.d.k!==f.step) return false;
+        if(f.step==="__late" ? !si.cur.late : f.step==="__custom" ? !si.cur.d.custom : si.cur.d.k!==f.step) return false;
       }
       if(f.dq){
         var hit = f.dq==="any" ? dqOf(t,dupC).length>0
@@ -1740,7 +1802,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     ["status","Trạng thái",function(v){return v==="__open"?"Đang mở":v;}],
     ["pic","PIC",null],["bpyc","BPYC",null],["supplier","NCC",null],
     ["priority","Hạn",function(v){return {urgent:"Quá hạn / Gấp",soon:"Sắp đến hạn",normal:"Bình thường"}[v]||v;}],
-    ["step","Bước",function(v){ if(v==="__late") return "Quá hạn mức"; var d=STEPS.find(function(x){return x.k===v;}); return d?d.s:v; }],
+    ["step","Bước",function(v){ if(v==="__late") return "Quá hạn mức"; if(v==="__custom") return "Bước bổ sung"; var d=STEPS.find(function(x){return x.k===v;}); return d?d.s:v; }],
     ["dq","Dữ liệu",function(v){ if(v==="any") return "Có lỗi"; var d=DQ_CHECKS.find(function(x){return x.k===v;}); return d?d.l:v; }],
     ["month","Tháng PR",function(v){return v.slice(5)+"/"+v.slice(0,4);}]
   ];
@@ -2234,11 +2296,14 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
   function buildActivity(old, neu){
     var who = state.me ? state.me.name : "Ai đó", now = new Date().toISOString(), out=[];
     function add(msg){ out.push({at:now, by:who, msg:msg}); }
-    if(!old){ add("tạo task"); var c0=curStepLabel(neu); if(c0 && c0!=="PR") add("chuyển bước PR → "+c0); }
+    if(!old){ add("tạo task"); (neu.custom_steps||[]).forEach(function(c){ add("thêm bước "+c.l); }); var c0=curStepLabel(neu); if(c0 && c0!=="PR") add("chuyển bước PR → "+c0); }
     else {
       var a=curStepLabel(old), b=curStepLabel(neu);
       if(a!==b && b) add("chuyển bước "+(a||"(chưa theo dõi)")+" → "+b);
-      STEPS.forEach(function(d){
+      var oc=old.custom_steps||[], nc=neu.custom_steps||[];
+      nc.forEach(function(c){ if(!oc.some(function(x){return x.k===c.k;})){ var aft=stepsFor(neu).find(function(d){return d.k===c.after;}); add("thêm bước "+c.l+(aft?" sau "+aft.s:"")); } });
+      oc.forEach(function(c){ if(!nc.some(function(x){return x.k===c.k;})) add("xóa bước "+c.l); });
+      stepsFor(neu).forEach(function(d){
         var o=(old.steps||{})[d.k]||{}, n=(neu.steps||{})[d.k]||{};
         if(!o.skip && n.skip) add("bỏ qua bước "+d.s);
         if(o.skip && !n.skip) add("dùng lại bước "+d.s);
@@ -2369,6 +2434,13 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
       var avg = durs.length ? durs.reduce(function(a,b){return a+b;},0)/durs.length : null;
       return {d:d, n:here.length, late:late.length, avg:avg, cnt:durs.length};
     });
+    var xHere=open.filter(function(t){ var c=stepInfo(t).cur; return c && c.d.custom; });
+    if(xHere.length || withSteps.some(function(t){ return (t.custom_steps||[]).length; })){
+      var xLate=xHere.filter(function(t){ return stepInfo(t).cur.late; });
+      xLate.forEach(function(t){ stuck.push({t:t,c:stepInfo(t).cur}); });
+      var xd=[]; withSteps.forEach(function(t){ stepInfo(t).list.forEach(function(x){ if(x.d.custom && x.state==="done") xd.push(x.days); }); });
+      cells.push({d:{k:"__custom",s:"Bước bổ sung",sla:"—"}, n:xHere.length, late:xLate.length, avg:xd.length?xd.reduce(function(a,b){return a+b;},0)/xd.length:null, cnt:xd.length});
+    }
     var maxAvg = Math.max.apply(null, cells.map(function(c){return c.avg||0;}).concat([1]));
     $("stageGrid").innerHTML = cells.map(function(c){
       return '<button class="stage'+(c.late?' hot':'')+'" data-k="'+c.d.k+'"><div class="nm">'+esc(c.d.s)+'</div>'+
@@ -2377,7 +2449,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
         '<div class="s">'+(c.avg===null?'chưa có dữ liệu':('TB '+c.avg.toLocaleString("vi-VN",{maximumFractionDigits:1})+' ngày · hạn mức '+c.d.sla))+'</div></button>';
     }).join("");
     $("stageGrid").querySelectorAll(".stage").forEach(function(b){
-      b.onclick=function(){ state.filters.step=b.dataset.k; $("fStep").value=b.dataset.k; switchTab("board"); renderTable(); };
+      b.onclick=function(){ state.filters.step=b.dataset.k; if(!$("fStep").querySelector('option[value="'+b.dataset.k+'"]')){ var o=document.createElement("option"); o.value=b.dataset.k; o.textContent="Bước bổ sung"; $("fStep").appendChild(o); } $("fStep").value=b.dataset.k; switchTab("board"); renderTable(); };
     });
     stuck.sort(function(a,b){ return (b.c.days-b.c.d.sla)-(a.c.days-a.c.d.sla); });
     $("stuckList").innerHTML = stuck.length ? '<div style="font-size:13px;font-weight:600;margin-bottom:6px;">Task đang kẹt quá hạn mức ('+stuck.length+')</div>'+
@@ -2491,6 +2563,8 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     $("mUrgentOverride").checked = t?!!t.urgent_override:false;
     $("mNote").value = t?(t.note||""):"";
     editSteps = JSON.parse(JSON.stringify((t&&t.steps)||{}));
+    editCustom = JSON.parse(JSON.stringify((t&&t.custom_steps)||[]));
+    $("addStepForm").hidden = true;
     if(!t || !hasSteps(t)){ if(!editSteps.pr) editSteps.pr={done:$("mPrDate").value||todayISO()}; }
     renderStepEditor();
     renderActivity(id ? t : null);
@@ -2537,6 +2611,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
       cancel_reason: status==="Hủy" ? $("mCancelReason").value.trim() : "",
       urgent_override: $("mUrgentOverride").checked,
       steps: readSteps(),
+      custom_steps: editCustom.slice(),
       note: $("mNote").value.trim(),
       created_at: existing ? (existing.created_at||todayISO()) : todayISO(),
       updated_at: todayISO(),
@@ -2553,7 +2628,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     if(!src) return;
     var clone=Object.assign({},src,{
       item:src.item+" (Copy)", status:"Chưa bắt đầu", complete_date:"", cancel_reason:"",
-      pr_date:todayISO(), accept:"", steps:{}, activity:[]
+      pr_date:todayISO(), accept:"", steps:{}, activity:[], custom_steps:(src.custom_steps||[]).slice()
     });
     openModal(null, clone);
   }
@@ -2801,6 +2876,8 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
       b.onclick=function(){ switchTab(b.dataset.tab); };
     });
     $("btnNew").onclick=function(){ openModal(null); };
+    $("btnAddStep").onclick=openAddStep; $("asOk").onclick=confirmAddStep; $("asCancel").onclick=function(){ $("addStepForm").hidden=true; };
+    $("asName").addEventListener("keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); confirmAddStep(); } });
     $("btnMoreF").onclick=function(){ var m=$("fMore"); m.hidden=!m.hidden; $("btnMoreF").setAttribute("aria-expanded",String(!m.hidden)); };
     document.querySelectorAll("[data-tpl]").forEach(function(b){ b.onclick=function(){ applyTemplate(b.dataset.tpl); }; });
     $("mPrDate").addEventListener("change",function(){ if(editSteps.pr){ editSteps.pr.done=$("mPrDate").value||editSteps.pr.done; } renderStepEditor(); });
