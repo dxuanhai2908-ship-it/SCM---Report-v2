@@ -681,6 +681,24 @@ html[data-glass="on"] .chip, html[data-glass="on"] .badge{box-shadow:inset 0 1px
 .step-row .delbtn{font:inherit;font-size:11.5px;border:0;background:transparent;color:var(--red-ink);cursor:pointer;text-decoration:underline;margin-left:6px;}
 .stepbar i.xstep{outline:1px solid rgba(201,162,74,.9);outline-offset:1px;}
 </style>
+
+<style>
+/* ===== Lỗi dữ liệu trong form ===== */
+.mdq{grid-column:1 / -1;border-radius:12px;padding:10px 12px;border:1px solid #F0C98A;background:#FFF6E3;}
+.mdq.ok{border-color:#9ED3B0;background:#E9F7EE;}
+.mdq-h{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#8A5A10;margin-bottom:6px;}
+.mdq.ok .mdq-h{color:#16723C;margin-bottom:0;}
+.mdq-i{display:flex;align-items:center;gap:8px;font-size:13px;padding:5px 0;border-top:1px dashed rgba(138,90,16,.2);}
+.mdq-i:first-of-type{border-top:0;}
+.mdq-i .dot{width:8px;height:8px;border-radius:50%;flex:none;}
+.mdq-i.bad .dot{background:#C0262F;} .mdq-i.warn .dot{background:#E08A1E;} .mdq-i.fixed .dot{background:#2E8B57;}
+.mdq-i .tx{flex:1;min-width:0;color:var(--ink);}
+.mdq-i .tx small{display:block;font-size:11.5px;color:var(--ink-soft);}
+.mdq-i.fixed .tx{color:#16723C;}
+.mdq-i button{border:1px solid currentColor;background:transparent;border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;font-weight:600;color:var(--navy);cursor:pointer;white-space:nowrap;}
+.field.dq-hl input,.field.dq-hl select,.field.dq-hl textarea{border-color:#E08A1E !important;box-shadow:0 0 0 3px rgba(224,138,30,.22) !important;}
+.field.dq-hl.bad input,.field.dq-hl.bad select{border-color:#C0262F !important;box-shadow:0 0 0 3px rgba(192,38,47,.18) !important;}
+</style>
 <style>
 /* ===== Activity log ===== */
 .act-box{grid-column:1 / -1;}
@@ -1081,6 +1099,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
       <button class="modal-close" id="modalClose" aria-label="Đóng">✕</button>
     </div>
     <div class="modal-body">
+      <div class="mdq" id="mDq" hidden aria-live="polite"></div>
       <div class="field full"><label>Tên hạng mục *</label>
         <input type="text" id="mItem" placeholder="VD: Thuê gian hàng sự kiện ra mắt phim Q4"></div>
       <div class="field"><label>BPYC</label><select id="mBpyc">
@@ -2287,6 +2306,44 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     renderRecent();
   }
 
+
+  /* ================= LỖI DỮ LIỆU TRONG FORM ================= */
+  var DQ_FIELD = {future:"mCompleteDateTxt", openDone:"mStatus", dup:"mItem", dueBeforePr:"mDueDateTxt",
+                  noPr:"mPrDateTxt", doneNoPrice:"mAccept", doneNoSup:"mSupplier", noReq:"mRequester"};
+  var DQ_FIX = {future:"Sửa ngày hoàn thành", openDone:"Đổi trạng thái", dup:"Đổi tên", dueBeforePr:"Sửa ngày giao",
+                noPr:"Nhập ngày PR", doneNoPrice:"Nhập giá", doneNoSup:"Nhập NCC", noReq:"Nhập người yêu cầu"};
+  function formCandidate(){
+    var st=$("mStatus").value, comp=$("mCompleteDate").value;
+    if(st==="Chưa bắt đầu"||st==="Đang xử lý") comp="";
+    return {id:state.editingId, item:$("mItem").value.trim(), requester:$("mRequester").value.trim(), supplier:$("mSupplier").value.trim(),
+      budget:$("mBudget").value!==""?Number($("mBudget").value):"", accept:$("mAccept").value!==""?Number($("mAccept").value):"",
+      pr_date:$("mPrDate").value, due_date:$("mDueDate").value, status:st, complete_date:comp};
+  }
+  function dqFor(t){
+    var others=state.tasks.filter(function(x){ return x.id!==t.id && x.status!=="Hủy" && dupKey(x)===dupKey(t); }).length;
+    var c={}; c[dupKey(t)]=others+1;
+    return DQ_CHECKS.filter(function(d){ return d.f(t,c); });
+  }
+  function renderFormDq(){
+    var box=$("mDq"); if(!box) return;
+    document.querySelectorAll("#modalOverlay .field.dq-hl").forEach(function(f){ f.classList.remove("dq-hl","bad"); });
+    var cand=formCandidate(), now=dqFor(cand);
+    var stored = state.editingId ? state.tasks.find(function(x){return x.id===state.editingId;}) : null;
+    var before = stored ? dqFor(stored) : [];
+    var fixed = before.filter(function(d){ return !now.some(function(x){return x.k===d.k;}); });
+    if(!now.length && !fixed.length){ box.hidden=!stored; box.className="mdq ok"; box.innerHTML='<div class="mdq-h">✓ Dữ liệu task này đã đầy đủ</div>'; return; }
+    box.hidden=false; box.className="mdq";
+    box.innerHTML = '<div class="mdq-h">'+(now.length?'⚠ '+now.length+' lỗi dữ liệu cần sửa':'✓ Đã sửa hết lỗi, bấm Lưu để cập nhật')+'</div>'+
+      now.map(function(d){ return '<div class="mdq-i '+d.sev+'"><span class="dot"></span><span class="tx">'+esc(d.l)+'<small>'+esc(d.p)+'</small></span>'+
+        (DQ_FIELD[d.k]?'<button type="button" data-goto="'+d.k+'">'+DQ_FIX[d.k]+'</button>':'')+'</div>'; }).join("")+
+      fixed.map(function(d){ return '<div class="mdq-i fixed"><span class="dot"></span><span class="tx">'+esc(d.l)+'<small>Đã sửa trong form — sẽ cập nhật khi bấm Lưu.</small></span></div>'; }).join("");
+    now.forEach(function(d){ var el=$(DQ_FIELD[d.k]); var f=el&&el.closest(".field"); if(f){ f.classList.add("dq-hl"); if(d.sev==="bad") f.classList.add("bad"); } });
+    box.querySelectorAll("[data-goto]").forEach(function(b){ b.onclick=function(){
+      var k=b.dataset.goto, el=$(DQ_FIELD[k]);
+      if(k==="future"||k==="openDone"){ var w=$("completeWrap"); if(w && k==="future") w.hidden=false; }
+      if(el){ el.scrollIntoView({block:"center",behavior:"smooth"}); setTimeout(function(){ el.focus(); },250); }
+    }; });
+  }
   /* ================= ACTIVITY LOG ================= */
   function stepShort(k){ var d=STEPS.find(function(x){return x.k===k;}); return d?d.s:k; }
   function curStepLabel(t){
@@ -2568,6 +2625,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     if(!t || !hasSteps(t)){ if(!editSteps.pr) editSteps.pr={done:$("mPrDate").value||todayISO()}; }
     renderStepEditor();
     renderActivity(id ? t : null);
+    renderFormDq();
     updateSavingPreview(); syncCancelField();
     $("modalOverlay").hidden=false;
     $("mItem").focus();
@@ -2876,6 +2934,9 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
       b.onclick=function(){ switchTab(b.dataset.tab); };
     });
     $("btnNew").onclick=function(){ openModal(null); };
+    ["input","change"].forEach(function(ev){ $("modalOverlay").addEventListener(ev,function(e){
+      if(e.target && /^(mItem|mRequester|mSupplier|mBudget|mAccept|mPrDate|mPrDateTxt|mDueDate|mDueDateTxt|mStatus|mCompleteDate|mCompleteDateTxt)$/.test(e.target.id)) setTimeout(renderFormDq,0);
+    }); });
     $("btnAddStep").onclick=openAddStep; $("asOk").onclick=confirmAddStep; $("asCancel").onclick=function(){ $("addStepForm").hidden=true; };
     $("asName").addEventListener("keydown",function(e){ if(e.key==="Enter"){ e.preventDefault(); confirmAddStep(); } });
     $("btnMoreF").onclick=function(){ var m=$("fMore"); m.hidden=!m.hidden; $("btnMoreF").setAttribute("aria-expanded",String(!m.hidden)); };
