@@ -683,6 +683,10 @@ html[data-glass="on"] .chip, html[data-glass="on"] .badge{box-shadow:inset 0 1px
 </style>
 
 <style>
+.nosteps-note{grid-column:1 / -1;font-size:12.5px;color:var(--ink-soft);padding:8px 12px;border:1px dashed rgba(0,0,0,.15);border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.nosteps-note button{border:1px solid currentColor;background:transparent;border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;color:var(--navy);cursor:pointer;}
+</style>
+<style>
 /* ===== Lỗi dữ liệu trong form ===== */
 .mdq{grid-column:1 / -1;border-radius:12px;padding:10px 12px;border:1px solid #F0C98A;background:#FFF6E3;}
 .mdq.ok{border-color:#9ED3B0;background:#E9F7EE;}
@@ -1136,7 +1140,9 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
       <div class="field full" id="cancelReasonWrap" hidden><label>Lý do hủy *</label>
         <input type="text" id="mCancelReason" placeholder="VD: BPYC rút yêu cầu, vượt ngân sách…"></div>
       <label class="chk-field full"><input type="checkbox" id="mUrgentOverride"> Đánh dấu là task GẤP (bất kể hạn giao)</label>
-      <div class="steps-box">
+      <div class="nosteps-note full" id="noStepsNote" hidden>Task cũ — không ghi nhận tiến độ quy trình.
+        <button type="button" id="btnTrackSteps">Theo dõi lại</button></div>
+      <div class="steps-box" id="stepsBox">
         <div class="steps-head"><b>Tiến độ quy trình</b>
           <div class="tpl"><span style="font-size:12px;color:var(--ink-faint);align-self:center;">Mẫu:</span>
             <button type="button" data-tpl="full">Đầy đủ 8 bước</button>
@@ -1503,6 +1509,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
             activeN:active.length, total:total, finished:!cur && active.length>0};
   }
   function stepHtml(t){
+    if(t.no_steps && !hasSteps(t)) return '<div class="stepwrap"><span class="step-now none">—</span></div>';
     if(!hasSteps(t)) return '<div class="stepwrap"><span class="step-now none">Chưa theo dõi bước</span></div>';
     var I=stepInfo(t);
     var bar='<div class="stepbar" aria-hidden="true">'+I.list.map(function(x){
@@ -1518,7 +1525,8 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
   }
 
   /* ---- trình sửa bước trong form ---- */
-  var editSteps = {}, editCustom = [], editAck = [];
+  var editSteps = {}, editCustom = [], editAck = [], editNoSteps = false;
+  function syncNoSteps(){ $("noStepsNote").hidden=!editNoSteps; $("stepsBox").hidden=editNoSteps; }
   function renderStepEditor(){
     var fake = {steps:editSteps, pr_date:$("mPrDate").value, custom_steps:editCustom};
     var I = stepInfo(fake);
@@ -2661,7 +2669,9 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     editCustom = JSON.parse(JSON.stringify((t&&t.custom_steps)||[]));
     editAck = ((t&&t.dq_ack)||[]).slice();
     $("addStepForm").hidden = true;
-    if(!t || !hasSteps(t)){ if(!editSteps.pr) editSteps.pr={done:$("mPrDate").value||todayISO()}; }
+    editNoSteps = !!(t && t.no_steps && !hasSteps(t));
+    if(!editNoSteps && (!t || !hasSteps(t))){ if(!editSteps.pr) editSteps.pr={done:$("mPrDate").value||todayISO()}; }
+    syncNoSteps();
     renderStepEditor();
     renderActivity(id ? t : null);
     renderFormDq();
@@ -2718,9 +2728,10 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
       complete_date: complete,
       cancel_reason: status==="Hủy" ? $("mCancelReason").value.trim() : "",
       urgent_override: $("mUrgentOverride").checked,
-      steps: readSteps(),
+      steps: editNoSteps ? {} : readSteps(),
       custom_steps: editCustom.slice(),
       dq_ack: editAck.slice(),
+      no_steps: editNoSteps,
       note: $("mNote").value.trim(),
       created_at: existing ? (existing.created_at||todayISO()) : todayISO(),
       updated_at: todayISO(),
@@ -2737,7 +2748,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     if(!src) return;
     var clone=Object.assign({},src,{
       item:src.item+" (Copy)", status:"Chưa bắt đầu", complete_date:"", cancel_reason:"",
-      pr_date:todayISO(), accept:"", steps:{}, activity:[], dq_ack:[], custom_steps:(src.custom_steps||[]).slice()
+      pr_date:todayISO(), accept:"", steps:{}, activity:[], dq_ack:[], no_steps:false, custom_steps:(src.custom_steps||[]).slice()
     });
     openModal(null, clone);
   }
@@ -3049,6 +3060,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     $("memberOverlay").addEventListener("click",function(e){ if(e.target.id==="memberOverlay") closeMember(); });
 
     $("btnLogout").onclick=doLogout;
+    $("btnTrackSteps").onclick=function(){ editNoSteps=false; if(!editSteps.pr) editSteps.pr={done:$("mPrDate").value||todayISO()}; syncNoSteps(); renderStepEditor(); };
     $("btnPw").onclick=openPw; $("pwClose").onclick=closePw; $("pwCancel").onclick=closePw; $("pwSave").onclick=savePw;
     $("pwOverlay").addEventListener("click",function(e){ if(e.target.id==="pwOverlay") closePw(); });
     $("pwNew2").addEventListener("keydown",function(e){ if(e.key==="Enter") savePw(); });
