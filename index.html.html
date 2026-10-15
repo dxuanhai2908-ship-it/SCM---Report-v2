@@ -695,6 +695,8 @@ html[data-glass="on"] .chip, html[data-glass="on"] .badge{box-shadow:inset 0 1px
 .mdq-i .tx{flex:1;min-width:0;color:var(--ink);}
 .mdq-i .tx small{display:block;font-size:11.5px;color:var(--ink-soft);}
 .mdq-i.fixed .tx{color:#16723C;}
+.mdq-i button + button{margin-left:-2px;}
+.mdq-i [data-ack],.mdq-i [data-unack]{color:var(--ink-soft) !important;}
 .mdq-i button{border:1px solid currentColor;background:transparent;border-radius:999px;padding:3px 10px;font:inherit;font-size:12px;font-weight:600;color:var(--navy);cursor:pointer;white-space:nowrap;}
 .field.dq-hl input,.field.dq-hl select,.field.dq-hl textarea{border-color:#E08A1E !important;box-shadow:0 0 0 3px rgba(224,138,30,.22) !important;}
 .field.dq-hl.bad input,.field.dq-hl.bad select{border-color:#C0262F !important;box-shadow:0 0 0 3px rgba(192,38,47,.18) !important;}
@@ -1429,6 +1431,8 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     state.tasks.forEach(function(t){ if(t.status!=="Hủy"){ var k=dupKey(t); c[k]=(c[k]||0)+1; } });
     return c;
   }
+  var DQ_SOFT = {doneNoPrice:"ngân sách / giá duyệt", noReq:"người yêu cầu"};
+  function dqAcked(t,k){ return (t.dq_ack||[]).indexOf(k)>=0; }
   var DQ_CHECKS = [
     {k:"future", sev:"bad", l:"Ngày hoàn thành ở tương lai", p:"Thường do gõ nhầm tháng.",
      f:function(t){ return t.complete_date && t.complete_date>todayISO(); }},
@@ -1441,11 +1445,11 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     {k:"noPr", sev:"warn", l:"Thiếu Ngày PR", p:"Không tính được lead time, dễ bị xếp sai tháng.",
      f:function(t){ return t.status!=="Hủy" && !t.pr_date; }},
     {k:"doneNoPrice", sev:"warn", l:"Hoàn thành nhưng thiếu ngân sách hoặc giá duyệt", p:"Không tính được saving.",
-     f:function(t){ return t.status==="Hoàn thành" && !hasBoth(t); }},
+     f:function(t){ return t.status==="Hoàn thành" && !hasBoth(t) && !dqAcked(t,"doneNoPrice"); }},
     {k:"doneNoSup", sev:"warn", l:"Hoàn thành nhưng chưa ghi NCC", p:"Thiếu dữ liệu đánh giá nhà cung cấp.",
      f:function(t){ return t.status==="Hoàn thành" && !t.supplier; }},
     {k:"noReq", sev:"warn", l:"Thiếu người yêu cầu", p:"Nên ghi họ tên người đề nghị.",
-     f:function(t){ return t.status!=="Hủy" && !t.requester; }}
+     f:function(t){ return t.status!=="Hủy" && !t.requester && !dqAcked(t,"noReq"); }}
   ];
   function dqOf(t, c){ c=c||dupNameCount(); return DQ_CHECKS.filter(function(d){ return d.f(t,c); }); }
 
@@ -1514,7 +1518,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
   }
 
   /* ---- trình sửa bước trong form ---- */
-  var editSteps = {}, editCustom = [];
+  var editSteps = {}, editCustom = [], editAck = [];
   function renderStepEditor(){
     var fake = {steps:editSteps, pr_date:$("mPrDate").value, custom_steps:editCustom};
     var I = stepInfo(fake);
@@ -2340,7 +2344,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     if(st==="Chưa bắt đầu"||st==="Đang xử lý") comp="";
     return {id:state.editingId, item:$("mItem").value.trim(), requester:$("mRequester").value.trim(), supplier:$("mSupplier").value.trim(),
       budget:$("mBudget").value!==""?Number($("mBudget").value):"", accept:$("mAccept").value!==""?Number($("mAccept").value):"",
-      pr_date:$("mPrDate").value, due_date:$("mDueDate").value, status:st, complete_date:comp};
+      pr_date:$("mPrDate").value, due_date:$("mDueDate").value, status:st, complete_date:comp, dq_ack:editAck.slice()};
   }
   function dqFor(t){
     var others=state.tasks.filter(function(x){ return x.id!==t.id && x.status!=="Hủy" && dupKey(x)===dupKey(t); }).length;
@@ -2353,14 +2357,25 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     var cand=formCandidate(), now=dqFor(cand);
     var stored = state.editingId ? state.tasks.find(function(x){return x.id===state.editingId;}) : null;
     var before = stored ? dqFor(stored) : [];
-    var fixed = before.filter(function(d){ return !now.some(function(x){return x.k===d.k;}); });
-    if(!now.length && !fixed.length){ box.hidden=!stored; box.className="mdq ok"; box.innerHTML='<div class="mdq-h">✓ Dữ liệu task này đã đầy đủ</div>'; return; }
+    var acked = DQ_CHECKS.filter(function(d){ return DQ_SOFT[d.k] && editAck.indexOf(d.k)>=0 && d.f(Object.assign({},cand,{dq_ack:[]}),{}); });
+    var fixed = before.filter(function(d){ return !now.some(function(x){return x.k===d.k;}) && !acked.some(function(x){return x.k===d.k;}); });
+    var ackHtml = acked.map(function(d){ return '<div class="mdq-i fixed"><span class="dot"></span><span class="tx">Không có '+DQ_SOFT[d.k]+'<small>Đã xác nhận — không tính là lỗi dữ liệu.</small></span><button type="button" data-unack="'+d.k+'">Hoàn tác</button></div>'; }).join("");
+    if(!now.length && !fixed.length){
+      if(acked.length){ box.hidden=false; box.className="mdq ok"; box.innerHTML='<div class="mdq-h" style="margin-bottom:6px;">✓ Dữ liệu task này đã đầy đủ</div>'+ackHtml; bindDqBtns(box); return; } box.hidden=!stored; box.className="mdq ok"; box.innerHTML='<div class="mdq-h">✓ Dữ liệu task này đã đầy đủ</div>'; return; }
     box.hidden=false; box.className="mdq";
     box.innerHTML = '<div class="mdq-h">'+(now.length?'⚠ '+now.length+' lỗi dữ liệu cần sửa':'✓ Đã sửa hết lỗi, bấm Lưu để cập nhật')+'</div>'+
       now.map(function(d){ return '<div class="mdq-i '+d.sev+'"><span class="dot"></span><span class="tx">'+esc(d.l)+'<small>'+esc(d.p)+'</small></span>'+
-        (DQ_FIELD[d.k]?'<button type="button" data-goto="'+d.k+'">'+DQ_FIX[d.k]+'</button>':'')+'</div>'; }).join("")+
+        (DQ_FIELD[d.k]?'<button type="button" data-goto="'+d.k+'">'+DQ_FIX[d.k]+'</button>':'')+
+        (DQ_SOFT[d.k]?'<button type="button" data-ack="'+d.k+'" title="Xác nhận task này không có '+DQ_SOFT[d.k]+'">Không có</button>':'')+'</div>'; }).join("")+ackHtml+
       fixed.map(function(d){ return '<div class="mdq-i fixed"><span class="dot"></span><span class="tx">'+esc(d.l)+'<small>Đã sửa trong form — sẽ cập nhật khi bấm Lưu.</small></span></div>'; }).join("");
     now.forEach(function(d){ var el=$(DQ_FIELD[d.k]); var f=el&&el.closest(".field"); if(f){ f.classList.add("dq-hl"); if(d.sev==="bad") f.classList.add("bad"); } });
+    bindDqBtns(box);
+  }
+  function bindDqBtns(box){
+    box.querySelectorAll("[data-ack]").forEach(function(b){ b.onclick=function(){
+      if(editAck.indexOf(b.dataset.ack)<0) editAck.push(b.dataset.ack); renderFormDq(); }; });
+    box.querySelectorAll("[data-unack]").forEach(function(b){ b.onclick=function(){
+      editAck=editAck.filter(function(k){ return k!==b.dataset.unack; }); renderFormDq(); }; });
     box.querySelectorAll("[data-goto]").forEach(function(b){ b.onclick=function(){
       var k=b.dataset.goto, el=$(DQ_FIELD[k]);
       if(k==="future"||k==="openDone"){ var w=$("completeWrap"); if(w && k==="future") w.hidden=false; }
@@ -2644,6 +2659,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     $("mNote").value = t?(t.note||""):"";
     editSteps = JSON.parse(JSON.stringify((t&&t.steps)||{}));
     editCustom = JSON.parse(JSON.stringify((t&&t.custom_steps)||[]));
+    editAck = ((t&&t.dq_ack)||[]).slice();
     $("addStepForm").hidden = true;
     if(!t || !hasSteps(t)){ if(!editSteps.pr) editSteps.pr={done:$("mPrDate").value||todayISO()}; }
     renderStepEditor();
@@ -2674,6 +2690,17 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
       return x.id!==state.editingId && x.status!=="Hủy" && normName(x.item)===normName(item) && (x.pr_date||"")===(pr||"");
     });
     if(dupe && !confirm('Đã có task "'+dupe.item+'" cùng ngày PR '+fmtDate(pr)+' ('+dupe.status+'). Có thể bạn đang tạo trùng. Vẫn lưu?')) return;
+    if(status==="Hoàn thành"){
+      var cand=formCandidate(); cand.status=status;
+      var miss=DQ_CHECKS.filter(function(d){ return DQ_SOFT[d.k] && d.f(cand,{}); });
+      if(miss.length){
+        var names=miss.map(function(d){ return DQ_SOFT[d.k]; }).join(" và ");
+        if(!confirm("Task chưa có "+names+".\nNên nhập để báo cáo tính đúng saving và người đề nghị.\n\nOK = xác nhận không có, vẫn lưu Done (không tính là lỗi dữ liệu).\nCancel = quay lại nhập.")){
+          var f=$(DQ_FIELD[miss[0].k]); if(f){ f.scrollIntoView({block:"center"}); f.focus(); } return;
+        }
+        miss.forEach(function(d){ if(editAck.indexOf(d.k)<0) editAck.push(d.k); });
+      }
+    }
     var existing = state.editingId ? state.tasks.find(function(x){return x.id===state.editingId;}) : null;
     var task = {
       id: existing ? existing.id : uid(),
@@ -2693,6 +2720,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
       urgent_override: $("mUrgentOverride").checked,
       steps: readSteps(),
       custom_steps: editCustom.slice(),
+      dq_ack: editAck.slice(),
       note: $("mNote").value.trim(),
       created_at: existing ? (existing.created_at||todayISO()) : todayISO(),
       updated_at: todayISO(),
@@ -2709,7 +2737,7 @@ body:has(.modal-overlay:not([hidden])) .skinbar{display:none !important;}
     if(!src) return;
     var clone=Object.assign({},src,{
       item:src.item+" (Copy)", status:"Chưa bắt đầu", complete_date:"", cancel_reason:"",
-      pr_date:todayISO(), accept:"", steps:{}, activity:[], custom_steps:(src.custom_steps||[]).slice()
+      pr_date:todayISO(), accept:"", steps:{}, activity:[], dq_ack:[], custom_steps:(src.custom_steps||[]).slice()
     });
     openModal(null, clone);
   }
